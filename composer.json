@@ -1,0 +1,29 @@
+{
+    "name": "basilicom/pimcore-plugin-health-check",
+    "description": "A Pimcore plugin that performs various checks regarding system health.",
+    "type": "pimcore-bundle",
+    "license": "GPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "Christoph Luehr",
+            "email": "christoph.luehr@basilicom.de",
+            "homepage": "https://www.basilicom.de",
+            "role": "Developer"
+        },
+        {
+            "name": "Kerstin Gerull",
+            "email": "kerstin.gerull@basilicom.de",
+            "homepage": "https://www.basilicom.de",
+            "role": "Developer"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Basilicom\\PimcorePluginHealthCheck\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=8.3",
+        "pimcore/pimcore": ">=11 || >=12"
+    }
+}

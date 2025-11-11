@@ -1,0 +1,3 @@
+pimcore_plugin_health_check:
+  resource: "@PimcorePluginHealthCheckBundle/Controller/"
+  type: attribute
