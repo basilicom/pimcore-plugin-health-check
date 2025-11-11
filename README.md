@@ -41,3 +41,14 @@ return [
 ];
 
 ```
+
+### Configuration
+You can disable certain checks by setting the corresponding config value to false.
+
+```
+pimcore_plugin_health_check:
+    database_check_enabled: true
+    cache_check_enabled: true
+    filesystem_check_enabled: true
+    robots_txt_check_enabled: true
+```

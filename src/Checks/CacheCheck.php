@@ -3,29 +3,31 @@
 namespace Basilicom\PimcorePluginHealthCheck\Checks;
 
 use Basilicom\PimcorePluginHealthCheck\Exception\CacheNotWriteableException;
-use Basilicom\PimcorePluginHealthCheck\Services\HealthCheckInterface;
 use Pimcore\Cache;
 
-class CacheCheck implements HealthCheckInterface
+class CacheCheck implements CheckInterface
 {
+    use ConfigurationTrait;
+
     public function check(): void
     {
         try {
             $putData = 'This is a test for the Pimcore cache.';
+            $cacheKey = 'cache_test';
 
             Cache::setForceImmediateWrite(true);
             Cache::save(
                 $putData,
-                $putData,
+                $cacheKey,
                 ['check_write'],
                 null,
                 0,
                 true
             );
 
-            $getData = Cache::load($putData);
+            $getData = Cache::load($cacheKey);
 
-            Cache::clearTag('check_write');
+            Cache::remove($cacheKey);
         } catch (\Exception $exception) {
             throw new CacheNotWriteableException('Pimcore cache error [' . $exception->getMessage() . ']');
         }
@@ -37,6 +39,6 @@ class CacheCheck implements HealthCheckInterface
 
     public function isActive(): bool
     {
-        return true;
+        return $this->isEnabled('cache_check_enabled');
     }
 }

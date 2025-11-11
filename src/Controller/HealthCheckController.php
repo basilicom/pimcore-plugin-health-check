@@ -44,6 +44,7 @@ class HealthCheckController
             } catch (Exception | NotFoundExceptionInterface | ContainerExceptionInterface) {
                 // no application logger available
             }
+
             $response->setContent("FAILURE: INTERNAL [$id] - see application log.");
         }
 

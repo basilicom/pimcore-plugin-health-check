@@ -3,14 +3,15 @@
 namespace Basilicom\PimcorePluginHealthCheck\Checks;
 
 use Basilicom\PimcorePluginHealthCheck\Exception\DatabaseNotAccessibleException;
-use Basilicom\PimcorePluginHealthCheck\Services\HealthCheckInterface;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception as DbalException;
 use Exception;
 use Pimcore;
 
-class DatabaseAccessibleCheck implements HealthCheckInterface
+class DatabaseAccessibleCheck implements CheckInterface
 {
+    use ConfigurationTrait;
+
     public function check(): void
     {
         try {
@@ -47,7 +48,6 @@ class DatabaseAccessibleCheck implements HealthCheckInterface
 
     public function isActive(): bool
     {
-        // bastodo add a configuration yml to enable/disable the checks
-        return true;
+        return $this->isEnabled('database_check_enabled');
     }
 }

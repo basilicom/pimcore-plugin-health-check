@@ -3,11 +3,12 @@
 namespace Basilicom\PimcorePluginHealthCheck\Checks;
 
 use Basilicom\PimcorePluginHealthCheck\Exception\FilesystemNotWriteableException;
-use Basilicom\PimcorePluginHealthCheck\Services\HealthCheckInterface;
 use Exception;
 
-class FilesystemCheck implements HealthCheckInterface
+class FilesystemCheck implements CheckInterface
 {
+    use ConfigurationTrait;
+
     public function check(): void
     {
         try {
@@ -26,6 +27,6 @@ class FilesystemCheck implements HealthCheckInterface
 
     public function isActive(): bool
     {
-        return true;
+        return $this->isEnabled('filesystem_check_enabled');
     }
 }

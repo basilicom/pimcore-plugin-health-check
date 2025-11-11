@@ -3,11 +3,10 @@
 namespace Basilicom\PimcorePluginHealthCheck\Checks;
 
 use Basilicom\PimcorePluginHealthCheck\Exception\ConfigurationNotReadableException;
-use Basilicom\PimcorePluginHealthCheck\Services\HealthCheckInterface;
 use Exception;
 use Pimcore\Config;
 
-class PimcoreConfigurationCheck implements HealthCheckInterface
+class PimcoreConfigurationCheck implements CheckInterface
 {
     public function check(): void
     {
@@ -25,6 +24,7 @@ class PimcoreConfigurationCheck implements HealthCheckInterface
 
     public function isActive(): bool
     {
+        // cannot be disabled, because it is required for disabling the other checks
         return true;
     }
 }

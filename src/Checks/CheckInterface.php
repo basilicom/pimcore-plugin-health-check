@@ -1,10 +1,10 @@
 <?php
 
-namespace Basilicom\PimcorePluginHealthCheck\Services;
+namespace Basilicom\PimcorePluginHealthCheck\Checks;
 
 use Basilicom\PimcorePluginHealthCheck\Exception\AbstractHealthCheckException;
 
-interface HealthCheckInterface
+interface CheckInterface
 {
     /**
      * @throws AbstractHealthCheckException
