@@ -12,3 +12,11 @@ services:
         resource: '../../Controller'
         public: true
         tags: ['controller.service_arguments']
+
+    Basilicom\PimcorePluginHealthCheck\Services\:
+        resource: '../../Services'
+        public: true
+
+    Basilicom\PimcorePluginHealthCheck\Checks\:
+        resource: '../../Checks'
+        public: true

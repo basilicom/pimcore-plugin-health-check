@@ -1,4 +1,4 @@
-# Pimcore PluginH ealth Check
+# Pimcore Plugin Health Check
 License: GPL v3
 
 ## Version information

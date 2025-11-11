@@ -40,8 +40,8 @@ class DatabaseAccessibleCheck implements HealthCheckInterface
             throw new DatabaseNotAccessibleException('Unable to query database. [' . $exception->getCode() . ']');
         }
 
-        if ($passwordHash == '6f773f0ae6141c0a3e645a561b6167b1') {
-            throw new DatabaseNotAccessibleException('Admin user is active and standard password is still set.');
+        if (!empty($passwordHash)) {
+            throw new DatabaseNotAccessibleException('Admin user is active.');
         }
     }
 
