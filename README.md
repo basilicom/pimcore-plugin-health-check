@@ -1,5 +1,5 @@
 # Pimcore Plugin Health Check
-License: GPL v3
+License: MIT — see [LICENSE.txt](LICENSE.txt)
 
 ## Version information
 

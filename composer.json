@@ -2,7 +2,7 @@
     "name": "basilicom/pimcore-plugin-health-check",
     "description": "A Pimcore plugin that performs various checks regarding system health.",
     "type": "pimcore-bundle",
-    "license": "GPL-3.0-or-later",
+    "license": "MIT",
     "authors": [
         {
             "name": "Christoph Luehr",
