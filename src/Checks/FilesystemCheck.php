@@ -1,32 +1,50 @@
 <?php
 
+declare(strict_types=1);
+
+/**
+ * This source file is available under the terms of the MIT License.
+ * Full copyright and license information is available in
+ * LICENSE.txt which is distributed with this source code.
+ *
+ * @copyright Copyright (c) Basilicom GmbH (https://basilicom.de)
+ * @license   MIT
+ */
+
 namespace Basilicom\PimcorePluginHealthCheck\Checks;
 
 use Basilicom\PimcorePluginHealthCheck\Exception\FilesystemNotWriteableException;
-use Exception;
 
-class FilesystemCheck implements CheckInterface
+final readonly class FilesystemCheck implements CheckInterface
 {
-    use ConfigurationTrait;
+    private const string PAYLOAD = 'pimcore-health-check';
+
+    public function __construct(
+        private string $temporaryDirectory,
+        private bool $enabled,
+    ) {
+    }
 
     public function check(): void
     {
-        try {
-            $putData = sha1(time());
-            file_put_contents(PIMCORE_SYSTEM_TEMP_DIRECTORY . '/check_write.tmp', $putData);
-            $getData = file_get_contents(PIMCORE_SYSTEM_TEMP_DIRECTORY . '/check_write.tmp');
-            unlink(PIMCORE_SYSTEM_TEMP_DIRECTORY . '/check_write.tmp');
-        } catch (Exception $exception) {
-            throw new FilesystemNotWriteableException('Unable to read/write a file. [' . $exception->getMessage() . ']');
+        // unique per run, so concurrent monitoring requests cannot delete each other's probe
+        $file = rtrim($this->temporaryDirectory, '/') . '/health-check-' . bin2hex(random_bytes(8)) . '.tmp';
+
+        if (@file_put_contents($file, self::PAYLOAD) === false) {
+            throw new FilesystemNotWriteableException('Pimcore temporary directory is not writeable.');
         }
 
-        if ($putData !== $getData) {
-            throw new FilesystemNotWriteableException('Error writing/reading a file.');
+        try {
+            if (@file_get_contents($file) !== self::PAYLOAD) {
+                throw new FilesystemNotWriteableException('Pimcore temporary directory returned unexpected content.');
+            }
+        } finally {
+            @unlink($file);
         }
     }
 
     public function isActive(): bool
     {
-        return $this->isEnabled('filesystem_check_enabled');
+        return $this->enabled;
     }
 }

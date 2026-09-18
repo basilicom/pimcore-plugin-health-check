@@ -1,0 +1,13 @@
+parameters:
+  reportUnmatchedIgnoredErrors: false
+  ignoreErrors:
+    - identifier: missingType.iterableValue
+    # Symfony 6.4 types the config builder chain too loosely; Pimcore 11 pins it there
+    -
+      identifier: method.notFound
+      path: src/DependencyInjection/Configuration.php
+  level: 6
+  paths:
+    - src
+  bootstrapFiles:
+    - phpstan-bootstrap.php

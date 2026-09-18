@@ -1,30 +1,43 @@
 <?php
 
+declare(strict_types=1);
+
+/**
+ * This source file is available under the terms of the MIT License.
+ * Full copyright and license information is available in
+ * LICENSE.txt which is distributed with this source code.
+ *
+ * @copyright Copyright (c) Basilicom GmbH (https://basilicom.de)
+ * @license   MIT
+ */
+
 namespace Basilicom\PimcorePluginHealthCheck\Checks;
 
 use Basilicom\PimcorePluginHealthCheck\Exception\ConfigurationNotReadableException;
-use Exception;
 use Pimcore\Config;
+use Throwable;
 
-class PimcoreConfigurationCheck implements CheckInterface
+final class PimcoreConfigurationCheck implements CheckInterface
 {
     public function check(): void
     {
         try {
-            $env = Config::getEnvironment();
+            $environment         = Config::getEnvironment();
             $systemConfiguration = Config::getSystemConfiguration();
-        } catch (Exception $exception) {
-            throw new ConfigurationNotReadableException('Pimcore environment/system configuration not readable: ' . $exception->getMessage());
+        } catch (Throwable $exception) {
+            throw new ConfigurationNotReadableException(
+                'Pimcore environment/system configuration is not readable.',
+                previous: $exception
+            );
         }
 
-        if (empty($env) || empty($systemConfiguration)) {
+        if ($environment === '' || empty($systemConfiguration)) {
             throw new ConfigurationNotReadableException('Pimcore environment/system configuration is empty.');
         }
     }
 
     public function isActive(): bool
     {
-        // cannot be disabled, because it is required for disabling the other checks
         return true;
     }
 }

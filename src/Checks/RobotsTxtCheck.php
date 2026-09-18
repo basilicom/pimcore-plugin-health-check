@@ -1,36 +1,51 @@
 <?php
 
+declare(strict_types=1);
+
+/**
+ * This source file is available under the terms of the MIT License.
+ * Full copyright and license information is available in
+ * LICENSE.txt which is distributed with this source code.
+ *
+ * @copyright Copyright (c) Basilicom GmbH (https://basilicom.de)
+ * @license   MIT
+ */
+
 namespace Basilicom\PimcorePluginHealthCheck\Checks;
 
 use Basilicom\PimcorePluginHealthCheck\Exception\RobotsTxtNotAvailableException;
-use Exception;
 
-class RobotsTxtCheck implements CheckInterface
+final readonly class RobotsTxtCheck implements CheckInterface
 {
-    use ConfigurationTrait;
+    public function __construct(
+        private string $webRootDirectory,
+        private bool $enabled,
+    ) {
+    }
 
     public function check(): void
     {
-        try {
-            $robotsArray = [];
-            $robotsTxt = fopen($_SERVER['DOCUMENT_ROOT'] . '/robots.txt', 'r');
-            while (!feof($robotsTxt)) {
-                $robotsArray[] = fgets($robotsTxt);
-            }
-            fclose($robotsTxt);
-        } catch (Exception) {
-            throw new RobotsTxtNotAvailableException("robots.txt is not available or not readable.");
+        $file = rtrim($this->webRootDirectory, '/') . '/robots.txt';
+
+        if (!is_file($file) || !is_readable($file)) {
+            throw new RobotsTxtNotAvailableException('robots.txt is not available or not readable.');
         }
 
-        foreach ($robotsArray as $robotsString) {
-            if (strtolower(str_replace(' ', '', $robotsString)) === 'disallow:/') {
-                throw new RobotsTxtNotAvailableException('robots.txt disallows whole domain.');
+        $lines = @file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($lines === false) {
+            throw new RobotsTxtNotAvailableException('robots.txt is not available or not readable.');
+        }
+
+        foreach ($lines as $line) {
+            // robots.txt lines carry their line break and arbitrary spacing; strip all of it before comparing
+            if (strtolower((string)preg_replace('/\s+/', '', $line)) === 'disallow:/') {
+                throw new RobotsTxtNotAvailableException('robots.txt disallows the whole domain.');
             }
         }
     }
 
     public function isActive(): bool
     {
-        return $this->isEnabled('robots_txt_check_enabled');
+        return $this->enabled;
     }
 }

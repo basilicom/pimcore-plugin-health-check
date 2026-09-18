@@ -1,22 +1,98 @@
 services:
     _defaults:
-        # automatically injects dependencies in your services
         autowire: true
-        # automatically registers your services as commands, event subscribers, etc.
         autoconfigure: true
-        # this means you cannot fetch services directly from the container via $container->get()
-        # if you need to do this, you can override this setting on individual services
         public: false
 
-    Basilicom\PimcorePluginHealthCheck\Controller\:
-        resource: '../../Controller'
-        public: true
-        tags: ['controller.service_arguments']
+    # Priorities put the checks that cost nothing first, so a hung dependency later on cannot eat
+    # the timeout budget before the free local diagnostics have run.
 
-    Basilicom\PimcorePluginHealthCheck\Services\:
-        resource: '../../Services'
-        public: true
+    Basilicom\PimcorePluginHealthCheck\Checks\PimcoreConfigurationCheck:
+        # first - every other check assumes a readable configuration
+        tags:
+            - { name: basilicom.health_check, priority: 100 }
 
-    Basilicom\PimcorePluginHealthCheck\Checks\:
-        resource: '../../Checks'
+    Basilicom\PimcorePluginHealthCheck\Checks\DiskSpaceCheck:
+        arguments:
+            $directory: '%pimcore_plugin_health_check.temp_directory%'
+            $enabled: '%pimcore_plugin_health_check.checks.disk_space.enabled%'
+            $warningBelowPercent: '%pimcore_plugin_health_check.checks.disk_space.warning_below_percent%'
+            $failureBelowPercent: '%pimcore_plugin_health_check.checks.disk_space.failure_below_percent%'
+        tags:
+            - { name: basilicom.health_check, priority: 95 }
+
+    Basilicom\PimcorePluginHealthCheck\Checks\DatabaseAccessibleCheck:
+        arguments:
+            $connection: '@doctrine.dbal.default_connection'
+            $enabled: '%pimcore_plugin_health_check.checks.database.enabled%'
+        tags:
+            - { name: basilicom.health_check, priority: 90 }
+
+    Basilicom\PimcorePluginHealthCheck\Checks\DatabaseLatencyCheck:
+        arguments:
+            $connection: '@doctrine.dbal.default_connection'
+            $enabled: '%pimcore_plugin_health_check.checks.database_latency.enabled%'
+            $thresholdMilliseconds: '%pimcore_plugin_health_check.checks.database_latency.threshold_ms%'
+        tags:
+            - { name: basilicom.health_check, priority: 85 }
+
+    Basilicom\PimcorePluginHealthCheck\Checks\PendingMigrationsCheck:
+        arguments:
+            $dependencyFactory: '@doctrine.migrations.dependency_factory'
+            $enabled: '%pimcore_plugin_health_check.checks.pending_migrations.enabled%'
+        tags:
+            - { name: basilicom.health_check, priority: 82 }
+
+    Basilicom\PimcorePluginHealthCheck\Checks\AdminUserCheck:
+        arguments:
+            $connection: '@doctrine.dbal.default_connection'
+            $enabled: '%pimcore_plugin_health_check.checks.admin_user.enabled%'
+            $userName: '%pimcore_plugin_health_check.checks.admin_user.user_name%'
+        tags:
+            - { name: basilicom.health_check, priority: 80 }
+
+    Basilicom\PimcorePluginHealthCheck\Checks\FilesystemCheck:
+        arguments:
+            $temporaryDirectory: '%pimcore_plugin_health_check.temp_directory%'
+            $enabled: '%pimcore_plugin_health_check.checks.filesystem.enabled%'
+        tags:
+            - { name: basilicom.health_check, priority: 70 }
+
+    Basilicom\PimcorePluginHealthCheck\Checks\AssetStorageCheck:
+        arguments:
+            $storage: '@Pimcore\Tool\Storage'
+            $enabled: '%pimcore_plugin_health_check.checks.asset_storage.enabled%'
+        tags:
+            - { name: basilicom.health_check, priority: 65 }
+
+    Basilicom\PimcorePluginHealthCheck\Checks\CacheCheck:
+        arguments:
+            $cache: '@pimcore.cache.pool'
+            $enabled: '%pimcore_plugin_health_check.checks.cache.enabled%'
+        tags:
+            - { name: basilicom.health_check, priority: 60 }
+
+    Basilicom\PimcorePluginHealthCheck\Checks\RobotsTxtCheck:
+        arguments:
+            $webRootDirectory: '%pimcore_plugin_health_check.web_root_directory%'
+            $enabled: '%pimcore_plugin_health_check.checks.robots_txt.enabled%'
+        tags:
+            - { name: basilicom.health_check, priority: 50 }
+
+    Basilicom\PimcorePluginHealthCheck\Services\HealthCheckService:
+        arguments:
+            $checks: !tagged_iterator { tag: basilicom.health_check }
+            $timeoutMilliseconds: '%pimcore_plugin_health_check.timeout_ms%'
+
+    Basilicom\PimcorePluginHealthCheck\Command\HealthCheckCommand:
+        arguments:
+            $token: '%pimcore_plugin_health_check.token%'
+
+    Basilicom\PimcorePluginHealthCheck\Controller\HealthCheckController:
         public: true
+        arguments:
+            $logger: '@logger'
+            $token: '%pimcore_plugin_health_check.token%'
+        tags:
+            - { name: monolog.logger, channel: health_check }
+            - 'controller.service_arguments'

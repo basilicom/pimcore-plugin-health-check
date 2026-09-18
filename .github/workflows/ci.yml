@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  coding-standards:
+    name: Coding standards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate composer.json
+        run: composer validate --strict --no-check-lock
+
+      # the pinned php-cs-fixer image from the Makefile, so CI and a local run cannot drift
+      - name: PHP-CS-Fixer
+        run: make lint-php
+
+  tests:
+    name: Pimcore ${{ matrix.pimcore }} on PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Pimcore 11 does not run on PHP 8.4, Pimcore 2026 does not run on PHP 8.3.
+        # Every combination below was verified to resolve before it was added here.
+        include:
+          - { pimcore: '^11.0', php: '8.3' }
+          - { pimcore: '^12.0', php: '8.3' }
+          - { pimcore: '^12.0', php: '8.4' }
+          - { pimcore: '^2026.0', php: '8.4' }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Pin the Pimcore line for this job
+        run: composer require --no-update --no-interaction pimcore/pimcore:'${{ matrix.pimcore }}'
+
+      # Every public Pimcore 11 release is covered by advisories whose fixes (11.5.16, 11.5.18)
+      # exist only in the commercial LTS repository, so composer refuses to resolve ^11.0 at all.
+      # The advisories are in Pimcore, not in this bundle; dropping the job would only stop us
+      # testing against a line our users still run.
+      - name: Allow the Pimcore 11 advisories
+        if: matrix.pimcore == '^11.0'
+        run: composer config audit.block-insecure false --no-interaction
+
+      # extensions are ignored on purpose: this is a library, its tests touch none of
+      # gd/intl/pdo_mysql, and installing them only adds failure modes of their own
+      - name: Install dependencies
+        run: |
+          composer update --no-progress --no-interaction --prefer-dist \
+            --ignore-platform-req=ext-* --ignore-platform-req=lib-*
+
+      - name: Show what was resolved
+        run: composer show pimcore/pimcore | head -3
+
+      - name: Tests
+        run: vendor/bin/phpunit --configuration phpunit.xml.dist --no-coverage
+
+      # analysed against the Pimcore version this job installed, which is what catches an API
+      # that moved or disappeared between the supported lines
+      - name: Static analysis
+        run: make lint-php-static VERSION_PHP=${{ matrix.php }}
