@@ -153,7 +153,7 @@ hung dependency can cost, it does not cap a single check.
 
 ### Configuration
 
-Every check is on by default except `database_latency`. A check is either a boolean or a block:
+Defaults are in the table above. A check is either a boolean or a block:
 
 ```yaml
 pimcore_plugin_health_check:

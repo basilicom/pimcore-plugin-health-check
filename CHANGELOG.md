@@ -24,7 +24,7 @@
   match on the `SUCCESS` / `FAILURE` body are unaffected; monitors keyed on the status code start
   reporting outages they previously missed.
 - The "admin user is active" condition moved out of `DatabaseAccessibleCheck` into its own
-  `AdminUserCheck`, switchable via `admin_user_check_enabled` (default: true, so behaviour is
+  `AdminUserCheck`, switchable via `checks.admin_user` (default: true, so behaviour is
   unchanged unless you turn it off). It now throws `AdminUserActiveException` rather than
   `DatabaseNotAccessibleException`.
 - Failures are logged to the Symfony `health_check` Monolog channel instead of the Pimcore
@@ -101,7 +101,7 @@
 - `bin/console basilicom:health-check`, which runs every active check, prints a table of results and
   exits non-zero on failure — usable as a deployment gate. Unlike the HTTP endpoint it does not stop
   at the first failure and it does print the reasons, because running it requires shell access.
-- `AdminUserCheck` and `admin_user_check_enabled`.
+- `AdminUserCheck` and `checks.admin_user`.
 - `Services\CheckResult`, the per-check result carrying the check class, its severity and its
   failure, if any.
 - `Severity` (`ok` / `warning` / `failure`). A check can report a warning instead of a failure;
