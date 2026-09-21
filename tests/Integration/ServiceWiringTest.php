@@ -255,7 +255,50 @@ class ServiceWiringTest extends TestCase
         );
     }
 
+    #[Test]
+    public function theTokenSurvivesTheFullCompilationWhenItComesFromAnEnvironmentVariable(): void
+    {
+        // prepare
+        // no container default on purpose: the merge pass then validates the node against the
+        // placeholder Symfony substitutes, which is what a project reading the token from .env hits
+        $_ENV['HEALTH_CHECK_TOKEN'] = 'a-valid-token-of-16-chars-or-more';
+
+        $container = $this->scaffoldedContainer();
+        $container->registerExtension(new PimcorePluginHealthCheckExtension());
+        $container->loadFromExtension('pimcore_plugin_health_check', ['token' => '%env(HEALTH_CHECK_TOKEN)%']);
+
+        // test
+        try {
+            $container->compile(true);
+        } finally {
+            unset($_ENV['HEALTH_CHECK_TOKEN']);
+        }
+
+        // verify
+        $this->assertSame(
+            'a-valid-token-of-16-chars-or-more',
+            $container->getParameter('pimcore_plugin_health_check.token')
+        );
+    }
+
     private function buildContainer(array $config = []): ContainerBuilder
+    {
+        $container = $this->scaffoldedContainer();
+
+        (new PimcorePluginHealthCheckExtension())->load([$config], $container);
+
+        $ids = array_merge(
+            self::CHECK_CLASSES,
+            [HealthCheckService::class, HealthCheckController::class, HealthCheckCommand::class]
+        );
+        foreach ($ids as $id) {
+            $container->getDefinition($id)->setPublic(true);
+        }
+
+        return $container;
+    }
+
+    private function scaffoldedContainer(): ContainerBuilder
     {
         $container = new ContainerBuilder();
         $container->setParameter('kernel.project_dir', '/tmp/project');
@@ -276,16 +319,6 @@ class ServiceWiringTest extends TestCase
 
         // mirrors FrameworkBundle's own autoconfiguration, absent here since only this bundle's extension loads
         $container->registerForAutoconfiguration(ConsoleCommand::class)->addTag('console.command');
-
-        (new PimcorePluginHealthCheckExtension())->load([$config], $container);
-
-        $ids = array_merge(
-            self::CHECK_CLASSES,
-            [HealthCheckService::class, HealthCheckController::class, HealthCheckCommand::class]
-        );
-        foreach ($ids as $id) {
-            $container->getDefinition($id)->setPublic(true);
-        }
 
         return $container;
     }

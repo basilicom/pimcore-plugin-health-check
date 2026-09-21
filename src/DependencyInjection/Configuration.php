@@ -35,7 +35,9 @@ final class Configuration implements ConfigurationInterface
                         ->then(static fn (string $token): ?string => trim($token) === '' ? null : trim($token))
                     ->end()
                     ->validate()
-                        ->ifTrue(static fn (mixed $token): bool => is_string($token) && strlen($token) < 16)
+                        // '' is the placeholder Symfony validates a %env()% node against, never a
+                        // real token: a literal empty string is normalised to null above
+                        ->ifTrue(static fn (mixed $token): bool => is_string($token) && $token !== '' && strlen($token) < 16)
                         ->thenInvalid('The health check token must be at least 16 characters long.')
                     ->end()
                 ->end()

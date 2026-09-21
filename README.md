@@ -100,8 +100,9 @@ pimcore_plugin_health_check:
     token: '%env(HEALTH_CHECK_TOKEN)%'
 ```
 
-The token must be at least 16 characters. Generate one with `openssl rand -hex 24` and keep it in
-the environment, not in a committed file.
+The token must be at least 16 characters. That is enforced on a literal value only - a token read
+from an env var is not visible while the container is built, so keep the length in mind there.
+Generate one with `openssl rand -hex 24` and keep it in the environment, not in a committed file.
 
 Callers then pass it either as a header, which is preferred because query strings end up in access
 logs, proxy logs and browser history:
