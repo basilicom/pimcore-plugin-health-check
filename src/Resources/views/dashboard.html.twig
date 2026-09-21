@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>System Health Status</title>
+    {# inline styles only - the page has to work behind a firewall without any external asset #}
+    <style>
+        :root {
+            --border: #e2e4e8;
+            --text: #1f2328;
+            --muted: #6b7280;
+            --ok-bg: #d8ece1;
+            --ok-fg: #1a7f4b;
+            --warning-bg: #fdf3d1;
+            --warning-fg: #a26c00;
+            --critical-bg: #f9dee2;
+            --critical-fg: #c0362c;
+            --neutral-bg: #eceef1;
+            --neutral-fg: #6b7280;
+            --accent: #2f6fed;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 32px 24px 48px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 15px;
+            line-height: 1.45;
+            color: var(--text);
+            background: #fff;
+        }
+
+        .page { max-width: 1400px; margin: 0 auto; }
+
+        .page-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        h1 { margin: 0; font-size: 40px; line-height: 1.1; letter-spacing: -0.02em; }
+
+        .meta { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+
+        .toggle { position: absolute; opacity: 0; pointer-events: none; }
+
+        .toggle-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 18px;
+            border-radius: 6px;
+            background: var(--accent);
+            color: #fff;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .toggle-label:hover { filter: brightness(0.94); }
+        .toggle:focus-visible + .page .toggle-label { outline: 2px solid var(--text); outline-offset: 2px; }
+
+        .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 4px; }
+
+        table { width: 100%; border-collapse: collapse; }
+
+        th, td {
+            text-align: left;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+
+        th { font-weight: 700; white-space: nowrap; }
+
+        tbody tr:last-child td { border-bottom: 0; }
+
+        td.status { white-space: nowrap; width: 1%; }
+        td.check { width: 25%; }
+
+        .status-cell { display: inline-flex; align-items: center; gap: 10px; }
+
+        .icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            font-size: 12px;
+            line-height: 1;
+            font-weight: 700;
+            color: #fff;
+            flex: 0 0 auto;
+        }
+
+        tr.row-ok       { background: var(--ok-bg); }
+        tr.row-warning  { background: var(--warning-bg); }
+        tr.row-critical { background: var(--critical-bg); }
+        tr.row-skipped,
+        tr.row-na       { background: var(--neutral-bg); color: var(--neutral-fg); }
+
+        tr.row-ok       .icon { background: var(--ok-fg); }
+        tr.row-warning  .icon { background: var(--warning-fg); }
+        tr.row-critical .icon { background: var(--critical-fg); }
+        tr.row-skipped  .icon,
+        tr.row-na       .icon { background: var(--neutral-fg); }
+
+        tr.details { display: none; }
+        .toggle:checked + .page tr.details { display: table-row; }
+
+        tr.details td { padding-top: 4px; font-size: 13px; }
+
+        dl.data { margin: 0; display: grid; grid-template-columns: minmax(140px, max-content) 1fr; gap: 2px 16px; }
+        dl.data dt { font-weight: 600; color: var(--muted); }
+        dl.data dd { margin: 0; overflow-wrap: anywhere; }
+
+        code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+
+        .empty { padding: 24px; text-align: center; color: var(--muted); }
+
+        @media (max-width: 640px) {
+            body { padding: 20px 12px 32px; }
+            h1 { font-size: 28px; }
+            th, td { padding: 10px 12px; }
+        }
+    </style>
+</head>
+<body>
+{# CSS-only disclosure: the checkbox in front of .page toggles every details row #}
+<input class="toggle" type="checkbox" id="health-check-details">
+<div class="page">
+    <div class="page-head">
+        <div>
+            <h1>System Health Status</h1>
+            <p class="meta">
+                {{ generatedAt|date('Y-m-d H:i:s') }}
+                &middot; overall: {{ overallStatus.label }}
+                &middot; {% for status, count in summary %}{{ count }} {{ status }}{% if not loop.last %}, {% endif %}{% endfor %}
+            </p>
+        </div>
+        <label class="toggle-label" for="health-check-details">&#9432; Details</label>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+            <tr>
+                <th>Status</th>
+                <th>Check</th>
+                <th>Message</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for result in results %}
+                <tr class="row-{{ result.status.value }}">
+                    <td class="status">
+                        <span class="status-cell">
+                            <span class="icon" aria-hidden="true">{{ result.status.icon }}</span>
+                            {{ result.status.label }}
+                        </span>
+                    </td>
+                    <td class="check">{{ result.label }}</td>
+                    <td>{{ result.message }}</td>
+                </tr>
+                <tr class="details row-{{ result.status.value }}">
+                    <td></td>
+                    <td colspan="2">
+                        <dl class="data">
+                            <dt>identifier</dt>
+                            <dd><code>{{ result.identifier }}</code></dd>
+                            <dt>duration</dt>
+                            <dd>{{ result.durationMs }} ms</dd>
+                            {% for key, value in result.data %}
+                                <dt>{{ key }}</dt>
+                                <dd><code>{{ value is iterable or value is same as(null) or value is same as(true) or value is same as(false) ? value|json_encode : value }}</code></dd>
+                            {% endfor %}
+                        </dl>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td class="empty" colspan="3">No checks are enabled.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+</body>
+</html>

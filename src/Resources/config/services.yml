@@ -1,22 +1,256 @@
 services:
     _defaults:
-        # automatically injects dependencies in your services
         autowire: true
-        # automatically registers your services as commands, event subscribers, etc.
         autoconfigure: true
-        # this means you cannot fetch services directly from the container via $container->get()
-        # if you need to do this, you can override this setting on individual services
         public: false
+        bind:
+            $connection: '@doctrine.dbal.default_connection'
 
-    Basilicom\PimcorePluginHealthCheck\Controller\:
-        resource: '../../Controller'
+    #
+    # Controllers
+    #
+    Basilicom\PimcorePluginHealthCheck\Controller\HealthCheckController:
         public: true
         tags: ['controller.service_arguments']
 
-    Basilicom\PimcorePluginHealthCheck\Services\:
-        resource: '../../Services'
+    Basilicom\PimcorePluginHealthCheck\Controller\DashboardController:
         public: true
+        tags: ['controller.service_arguments']
+        arguments:
+            $dashboardEnabled: '%pimcore_plugin_health_check.dashboard.enabled%'
 
-    Basilicom\PimcorePluginHealthCheck\Checks\:
-        resource: '../../Checks'
+    Basilicom\PimcorePluginHealthCheck\Controller\ApiController:
         public: true
+        tags: ['controller.service_arguments']
+        arguments:
+            $apiEnabled: '%pimcore_plugin_health_check.api.enabled%'
+
+    #
+    # Services
+    #
+    Basilicom\PimcorePluginHealthCheck\Services\HealthCheckService:
+        public: true
+        arguments:
+            $checks: !tagged_iterator pimcore_plugin_health_check.check
+
+    Basilicom\PimcorePluginHealthCheck\Services\AccessGuard:
+        arguments:
+            $apiKey: '%pimcore_plugin_health_check.api.api_key%'
+            $authorizationChecker: '@?security.authorization_checker'
+
+    Basilicom\PimcorePluginHealthCheck\Services\EndOfLifeDateClient:
+        arguments:
+            $cache: '@?cache.app'
+            $enabled: '%pimcore_plugin_health_check.external_lookups.enabled%'
+            $timeout: '%pimcore_plugin_health_check.external_lookups.timeout%'
+            $cacheTtl: '%pimcore_plugin_health_check.external_lookups.cache_ttl%'
+            $httpClient: '@?Symfony\Contracts\HttpClient\HttpClientInterface'
+
+    Basilicom\PimcorePluginHealthCheck\Services\EndOfLifeDateClientInterface:
+        alias: Basilicom\PimcorePluginHealthCheck\Services\EndOfLifeDateClient
+
+    #
+    # Checks - system
+    #
+    Basilicom\PimcorePluginHealthCheck\Check\PimcoreConfigurationCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.pimcore_configuration%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\DatabaseAccessibleCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.database_accessible%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\FilesystemCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.filesystem%'
+            $temporaryDirectory: '%kernel.project_dir%/var/tmp'
+
+    Basilicom\PimcorePluginHealthCheck\Check\CacheCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.cache%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\RobotsTxtCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.robots_txt%'
+            $defaultPath: '%kernel.project_dir%/public/robots.txt'
+
+    Basilicom\PimcorePluginHealthCheck\Check\AppEnvironmentCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.app_environment%'
+            $currentEnvironment: '%kernel.environment%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\PhpVersionCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.php_version%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\MysqlVersionCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.mysql_version%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\HttpsConnectionCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.https_connection%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\DoctrineMigrationsCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.doctrine_migrations%'
+            $dependencyFactory: '@?doctrine.migrations.dependency_factory'
+
+    #
+    # Checks - device
+    #
+    Basilicom\PimcorePluginHealthCheck\Check\DiskUsageCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.disk_usage%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\HostingSizeCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.hosting_size%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\DatabaseSizeCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.database_size%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\DatabaseTableSizeCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.database_table_size%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\ThumbnailStorageCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.thumbnail_storage%'
+
+    #
+    # Checks - pimcore
+    #
+    Basilicom\PimcorePluginHealthCheck\Check\PimcoreVersionCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.pimcore_version%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\PimcoreBundlesCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.pimcore_bundles%'
+            $bundleManager: '@?Pimcore\Extension\Bundle\PimcoreBundleManager'
+
+    Basilicom\PimcorePluginHealthCheck\Check\PimcoreAreabricksCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.pimcore_areabricks%'
+            $areabrickManager: '@?Pimcore\Extension\Document\Areabrick\AreabrickManagerInterface'
+
+    Basilicom\PimcorePluginHealthCheck\Check\PimcoreUsersCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.pimcore_users%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\PimcoreElementCountCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.pimcore_element_count%'
+
+    #
+    # Checks - maintenance
+    #
+    Basilicom\PimcorePluginHealthCheck\Check\MaintenanceLastRunCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.maintenance_last_run%'
+            $executor: '@?Pimcore\Maintenance\Executor'
+
+    Basilicom\PimcorePluginHealthCheck\Check\MessengerMessageCountCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.messenger_message_count%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\MessengerMessageAgeCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.messenger_message_age%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\FailedMessagesCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.failed_messages%'
+
+    #
+    # Checks - logs
+    #
+    Basilicom\PimcorePluginHealthCheck\Check\LogFileErrorsCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.log_file_errors%'
+            $defaultLogDir: '%kernel.logs_dir%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\ApplicationLogErrorsCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.application_log_errors%'
+
+    #
+    # Checks - security
+    #
+    Basilicom\PimcorePluginHealthCheck\Check\ComposerAuditCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.composer_audit%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\ComposerOutdatedCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.composer_outdated%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\InactiveAdminUsersCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.inactive_admin_users%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\UsersWithoutTwoFactorCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.users_without_2fa%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\DebugModeCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.debug_mode%'
+            $debug: '%kernel.debug%'
+            $environment: '%kernel.environment%'
+
+    #
+    # Checks - database
+    #
+    Basilicom\PimcorePluginHealthCheck\Check\VersionsTableBloatCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.versions_table_bloat%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\LargestTablesCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.largest_tables%'
+
+    #
+    # Checks - data
+    #
+    Basilicom\PimcorePluginHealthCheck\Check\DataObjectClassesCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.dataobject_classes%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\AssetsStorageCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.assets_storage%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\ObjectsPerClassCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.objects_per_class%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\DocumentsByTypeCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.documents_by_type%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\StaleObjectsCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.stale_objects%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\UnpublishedObjectsCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.unpublished_objects%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\AssetsWithoutMetadataCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.assets_without_metadata%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\AssetTypesCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.asset_types%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\CustomTemplatesCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.custom_templates%'
+
+    Basilicom\PimcorePluginHealthCheck\Check\DocumentsMissingSeoCheck:
+        arguments:
+            $config: '%pimcore_plugin_health_check.checks.documents_missing_seo%'
