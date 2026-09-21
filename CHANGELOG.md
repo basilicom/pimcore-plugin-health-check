@@ -51,6 +51,15 @@
   `fopen()` result was passed to `feof()`. A missing file now fails the check as intended.
 - `RobotsTxtCheck` resolved the web root from `$_SERVER['DOCUMENT_ROOT']`, which is empty on CLI and
   unreliable behind some web servers. It now uses `PIMCORE_WEB_ROOT`.
+- `RobotsTxtCheck` looked for a file in the web root only, while Pimcore answers `/robots.txt`
+  from `_pimcore_service_robots_txt` out of its own settings. A site whose robots.txt lives there -
+  the normal Pimcore setup - was reported missing, and a `Disallow: /` configured in the SEO
+  settings, the way it actually happens on Pimcore, went unnoticed. A robots.txt is still
+  mandatory, but it now counts as served when either a file exists or Pimcore has one configured.
+  Pimcore's built-in "allow everything" fallback does not count: that is what a site gets when
+  nobody decided anything. A missing robots.txt and a `Disallow: /` both report a warning rather
+  than a failure now - they cost reach, not availability, and dropping the node from the load
+  balancer fixes neither.
 - `FilesystemCheck` ignored the return value of `file_put_contents()` and used a fixed probe file
   name, so two concurrent monitoring requests could delete each other's probe.
 - `CacheCheck` used a fixed cache key with the same race, and left `Cache::setForceImmediateWrite(true)`

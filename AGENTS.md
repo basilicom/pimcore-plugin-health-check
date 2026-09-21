@@ -5,7 +5,7 @@ Instructions for AI coding agents working on this repository.
 ## What this is
 
 A Pimcore bundle with exactly one runtime entry point: `GET /health-check-status`. It runs a list
-of checks and answers `SUCCESS` (200) or `FAILURE: <reason>` (503) in `text/plain`, for uptime
+of checks and answers `SUCCESS` (200) or `FAILURE: [<id>]` (503) in `text/plain`, for uptime
 monitors such as StatusCake or Pingdom.
 
 A second route, `GET /health-check-live`, runs no check and always answers `SUCCESS`.
@@ -106,7 +106,9 @@ it is what catches an API that moved or disappeared between the supported lines.
   but it also means a pool fronted by an in-memory adapter can answer the read from memory and hide
   a dead backend.
 - `RobotsTxtCheck` only rejects a bare `Disallow: /` line. It does not parse user-agent groups, so
-  a `Disallow: /` that applies to one crawler only still fails the check.
+  a `Disallow: /` that applies to one crawler only still fails the check. It also cannot tell which
+  site a request would resolve to, so it rejects a `Disallow: /` configured for any of them, and a
+  project that configures robots.txt for some sites only passes on the strength of the others.
 - **The response time is still weakly correlated with what failed.** The body is opaque and every
   check now runs on every request, so the *ordering* signal is gone, and `timeout_ms` bounds the
   range. But a failing check takes a different amount of time than a passing one, and that remains

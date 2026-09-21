@@ -138,7 +138,7 @@ makes the server touch the database.
 | `FilesystemCheck` | Pimcore's temporary directory is not writeable | failure | `filesystem` | on |
 | `AssetStorageCheck` | the Pimcore asset storage cannot store and return a probe | failure | `asset_storage` | off |
 | `CacheCheck` | the Pimcore cache pool cannot store and return a value | failure | `cache` | on |
-| `RobotsTxtCheck` | `robots.txt` is missing, unreadable, or contains `Disallow: /` | failure | `robots_txt` | on |
+| `RobotsTxtCheck` | no `robots.txt` is served at all, or the one served contains `Disallow: /` (warning); a file in the web root is unreadable (failure) | warning, then failure | `robots_txt` | on |
 
 Checks run in the order listed. The cheap local ones come first on purpose: a hung dependency
 further down must not eat the timeout budget before the free diagnostics have run.

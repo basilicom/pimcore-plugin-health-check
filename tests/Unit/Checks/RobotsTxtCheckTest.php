@@ -15,9 +15,11 @@ namespace Basilicom\PimcorePluginHealthCheck\Tests\Unit\Checks;
 
 use Basilicom\PimcorePluginHealthCheck\Checks\RobotsTxtCheck;
 use Basilicom\PimcorePluginHealthCheck\Exception\RobotsTxtNotAvailableException;
+use Basilicom\PimcorePluginHealthCheck\Severity;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Pimcore\Bundle\SeoBundle\Config;
 
 class RobotsTxtCheckTest extends TestCase
 {
@@ -27,10 +29,15 @@ class RobotsTxtCheckTest extends TestCase
     {
         $this->webRoot = sys_get_temp_dir() . '/health-check-webroot-' . bin2hex(random_bytes(8));
         mkdir($this->webRoot);
+
+        // the check falls back to Pimcore's settings when no file exists; start from a clean one
+        Config::setRobotsConfig([]);
     }
 
     protected function tearDown(): void
     {
+        Config::setRobotsConfig([]);
+
         if (is_file($this->webRoot . '/robots.txt')) {
             chmod($this->webRoot . '/robots.txt', 0644);
             unlink($this->webRoot . '/robots.txt');
@@ -63,6 +70,7 @@ class RobotsTxtCheckTest extends TestCase
         } catch (RobotsTxtNotAvailableException $exception) {
             // verify
             $this->assertSame('robots.txt disallows the whole domain.', $exception->getMessage());
+            $this->assertSame(Severity::Warning, $exception->severity());
         }
     }
 
@@ -81,14 +89,83 @@ class RobotsTxtCheckTest extends TestCase
     }
 
     #[Test]
-    public function check_throwsWhenRobotsTxtIsMissing(): void
+    public function check_warnsWhenNeitherAFileNorAPimcoreSettingServesOne(): void
     {
         // prepare
         $check = new RobotsTxtCheck($this->webRoot, true);
 
-        // test / verify
-        $this->expectException(RobotsTxtNotAvailableException::class);
+        // test
+        try {
+            $check->check();
+            $this->fail('Expected exception was not thrown.');
+        } catch (RobotsTxtNotAvailableException $exception) {
+            // verify
+            $this->assertSame(Severity::Warning, $exception->severity());
+        }
+    }
+
+    #[Test]
+    public function check_warnsWhenTheOnlyConfiguredEntryIsBlank(): void
+    {
+        // prepare
+        Config::setRobotsConfig(['0' => "  \n "]);
+        $check = new RobotsTxtCheck($this->webRoot, true);
+
+        // test
+        try {
+            $check->check();
+            $this->fail('Expected exception was not thrown.');
+        } catch (RobotsTxtNotAvailableException $exception) {
+            // verify
+            $this->assertSame(Severity::Warning, $exception->severity());
+        }
+    }
+
+    #[Test]
+    public function check_doesNotThrowWhenPimcoreServesAConfiguredRobotsTxt(): void
+    {
+        // prepare
+        Config::setRobotsConfig(['0' => "User-agent: *\nDisallow: /admin\n"]);
+        $check = new RobotsTxtCheck($this->webRoot, true);
+
+        // test
         $check->check();
+
+        // verify
+        $this->addToAssertionCount(1);
+    }
+
+    #[Test]
+    public function check_throwsWhenAConfiguredSiteDisallowsTheWholeDomain(): void
+    {
+        // prepare
+        Config::setRobotsConfig(['0' => "User-agent: *\nDisallow:\n", '3' => "User-agent: *\nDisallow: /\n"]);
+        $check = new RobotsTxtCheck($this->webRoot, true);
+
+        // test
+        try {
+            $check->check();
+            $this->fail('Expected exception was not thrown.');
+        } catch (RobotsTxtNotAvailableException $exception) {
+            // verify
+            $this->assertSame('robots.txt disallows the whole domain.', $exception->getMessage());
+            $this->assertSame(Severity::Warning, $exception->severity());
+        }
+    }
+
+    #[Test]
+    public function check_ignoresPimcoreSettingsWhileTheWebServerServesAFile(): void
+    {
+        // prepare
+        file_put_contents($this->webRoot . '/robots.txt', "User-agent: *\nDisallow:\n");
+        Config::setRobotsConfig(['0' => "User-agent: *\nDisallow: /\n"]);
+        $check = new RobotsTxtCheck($this->webRoot, true);
+
+        // test
+        $check->check();
+
+        // verify
+        $this->addToAssertionCount(1);
     }
 
     #[Test]
