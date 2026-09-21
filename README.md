@@ -38,6 +38,23 @@ unauthenticated, and an anonymous caller must not be able to map the response ba
 your system. The `<id>` is a random correlation id; the actual reason is written to the log under
 the `health_check` Monolog channel with that same id.
 
+Where that ends up is the host project's decision. With Pimcore's own Monolog defaults the `prod`
+handler writes `var/log/prod-error.log` at level `error` and filters no channels, so failures land
+there without any setup — but the warning and the rejected-token notice are below that level and
+are dropped, not buffered. To keep them, give the channel its own handler:
+
+```yaml
+monolog:
+    handlers:
+        health_check:
+            type: stream
+            path: '%kernel.logs_dir%/health_check.log'
+            level: notice
+            channels: [health_check]
+```
+
+Errors then appear in both files; add `'!health_check'` to the other handlers if that bothers you.
+
 To see the reasons directly, run the console command — it has the full picture:
 
 ```
