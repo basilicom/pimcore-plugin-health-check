@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Basilicom\PimcorePluginHealthCheck\Services;
 
 use Basilicom\PimcorePluginHealthCheck\Checks\CheckInterface;
+use Basilicom\PimcorePluginHealthCheck\Checks\ReportingCheckInterface;
 use Basilicom\PimcorePluginHealthCheck\Exception\AbstractHealthCheckException;
 use Basilicom\PimcorePluginHealthCheck\Exception\HealthCheckTimedOutException;
 use Basilicom\PimcorePluginHealthCheck\Severity;
@@ -53,21 +54,54 @@ final readonly class HealthCheckService
                 break;
             }
 
+            $start = hrtime(true);
+
             try {
+                // a reporting check has something to say when it passes, which check(): void cannot carry
+                if ($check instanceof ReportingCheckInterface) {
+                    $report    = $check->inspect();
+                    $results[] = $this->result($check, $report->severity, null, $report->message, $report->data, $start);
+
+                    continue;
+                }
+
                 $check->check();
-                $results[] = new CheckResult($check::class);
+                $results[] = $this->result($check, Severity::Ok, null, '', [], $start);
 
                 continue;
             } catch (AbstractHealthCheckException $exception) {
-                $result = new CheckResult($check::class, $exception->severity(), $exception);
+                $result = $this->result($check, $exception->severity(), $exception, '', [], $start);
             } catch (Throwable $exception) {
                 // anything that is not a health check exception is a defect, never a mere warning
-                $result = new CheckResult($check::class, Severity::Failure, $exception);
+                $result = $this->result($check, Severity::Failure, $exception, '', [], $start);
             }
 
             $results[] = $result;
         }
 
         return $results;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function result(
+        CheckInterface $check,
+        Severity $severity,
+        ?Throwable $failure,
+        string $message,
+        array $data,
+        int $start,
+    ): CheckResult {
+        $reporting = $check instanceof ReportingCheckInterface;
+
+        return new CheckResult(
+            $check::class,
+            $severity,
+            $failure,
+            $message,
+            $data,
+            $reporting ? $check->identifier() : null,
+            $reporting ? $check->label() : null,
+            intdiv(hrtime(true) - $start, 1_000_000),
+        );
     }
 }

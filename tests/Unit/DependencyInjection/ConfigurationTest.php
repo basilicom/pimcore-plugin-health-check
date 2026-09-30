@@ -22,7 +22,7 @@ use Symfony\Component\Config\Definition\Processor;
 class ConfigurationTest extends TestCase
 {
     #[Test]
-    public function processConfiguration_defaultsAllChecksToEnabled(): void
+    public function processConfiguration_defaultsMatchTheDocumentedTree(): void
     {
         // prepare
         $processor = new Processor();
@@ -35,16 +35,231 @@ class ConfigurationTest extends TestCase
             [
                 'token'      => null,
                 'timeout_ms' => 5000,
-                'checks'     => [
-                    'database'           => ['enabled' => true],
-                    'database_latency'   => ['enabled' => false, 'threshold_ms' => 1000],
-                    'admin_user'         => ['enabled' => true, 'user_name' => 'admin'],
-                    'filesystem'         => ['enabled' => true],
-                    'cache'              => ['enabled' => true],
-                    'robots_txt'         => ['enabled' => true],
-                    'asset_storage'      => ['enabled' => false],
-                    'pending_migrations' => ['enabled' => false],
-                    'disk_space'         => ['enabled' => false, 'warning_below_percent' => 20, 'failure_below_percent' => 5],
+                'dashboard'  => [
+                    'enabled'  => true,
+                    'path'     => '/health-check',
+                    'api_path' => '/health-check/api',
+                    'api_key'  => null,
+                ],
+                'audit' => [
+                    'timeout_ms'               => 120000,
+                    'directory_size_timeout_s' => 30,
+                ],
+                'external_lookups' => [
+                    'enabled'             => true,
+                    'timeout_s'           => 3,
+                    'cache_ttl_s'         => 86400,
+                    'failure_cache_ttl_s' => 600,
+                ],
+                'messenger' => [
+                    'failed_queue_names' => ['failed'],
+                ],
+                'checks' => [
+                    'database' => [
+                        'enabled' => true,
+                    ],
+                    'database_latency' => [
+                        'enabled'      => false,
+                        'threshold_ms' => 1000,
+                    ],
+                    'admin_user' => [
+                        'enabled'   => true,
+                        'user_name' => 'admin',
+                    ],
+                    'filesystem' => [
+                        'enabled' => true,
+                    ],
+                    'cache' => [
+                        'enabled' => true,
+                    ],
+                    'robots_txt' => [
+                        'enabled' => true,
+                    ],
+                    'asset_storage' => [
+                        'enabled' => false,
+                    ],
+                    'pending_migrations' => [
+                        'enabled' => false,
+                    ],
+                    'disk_space' => [
+                        'enabled'               => false,
+                        'warning_below_percent' => 20,
+                        'failure_below_percent' => 5,
+                    ],
+                    'https_connection' => [
+                        'enabled' => true,
+                    ],
+                    'app_environment' => [
+                        'enabled'     => true,
+                        'environment' => '%kernel.environment%',
+                    ],
+                    'php_version' => [
+                        'enabled'  => true,
+                        'version'  => null,
+                        'operator' => '>=',
+                    ],
+                    'mysql_version' => [
+                        'enabled'  => true,
+                        'version'  => null,
+                        'operator' => '>=',
+                    ],
+                    'doctrine_migrations' => [
+                        'enabled' => true,
+                    ],
+                    'debug_mode' => [
+                        'enabled' => true,
+                    ],
+                    'hosting_size' => [
+                        'enabled'           => true,
+                        'warning_threshold' => 48318382080,
+                        'failure_threshold' => 53687091200,
+                    ],
+                    'thumbnail_storage' => [
+                        'enabled'           => true,
+                        'warning_threshold' => null,
+                        'failure_threshold' => null,
+                    ],
+                    'database_size' => [
+                        'enabled'           => true,
+                        'warning_threshold' => 9878424780,
+                        'failure_threshold' => 10737418240,
+                    ],
+                    'database_table_size' => [
+                        'enabled'           => true,
+                        'warning_threshold' => 943718400,
+                        'failure_threshold' => 1073741824,
+                    ],
+                    'pimcore_version' => [
+                        'enabled' => true,
+                    ],
+                    'pimcore_bundles' => [
+                        'enabled' => true,
+                    ],
+                    'pimcore_areabricks' => [
+                        'enabled' => true,
+                    ],
+                    'pimcore_users' => [
+                        'enabled' => true,
+                    ],
+                    'dataobject_classes' => [
+                        'enabled' => true,
+                    ],
+                    'documents_by_type' => [
+                        'enabled' => true,
+                    ],
+                    'custom_templates' => [
+                        'enabled' => true,
+                    ],
+                    'pimcore_element_count' => [
+                        'enabled'           => true,
+                        'warning_threshold' => 100000,
+                        'failure_threshold' => 150000,
+                    ],
+                    'maintenance_last_run' => [
+                        'enabled'         => true,
+                        'warning_minutes' => 120,
+                        'failure_minutes' => 1440,
+                    ],
+                    'messenger_message_count' => [
+                        'enabled'           => true,
+                        'warning_threshold' => 500,
+                        'failure_threshold' => 1000,
+                    ],
+                    'messenger_message_age' => [
+                        'enabled'           => true,
+                        'warning_threshold' => 60,
+                        'failure_threshold' => 180,
+                    ],
+                    'failed_messages' => [
+                        'enabled'           => true,
+                        'warning_threshold' => 1,
+                        'failure_threshold' => 50,
+                    ],
+                    'log_file_errors' => [
+                        'enabled'           => true,
+                        'files'             => ['prod.log', 'php.log'],
+                        'lookback_hours'    => 24,
+                        'max_bytes'         => 5242880,
+                        'warning_threshold' => 10,
+                        'failure_threshold' => 50,
+                    ],
+                    'application_log_errors' => [
+                        'enabled'           => true,
+                        'lookback_hours'    => 24,
+                        'warning_threshold' => 10,
+                        'failure_threshold' => 50,
+                    ],
+                    'composer_audit' => [
+                        'enabled'   => false,
+                        'binary'    => 'composer',
+                        'timeout_s' => 60,
+                    ],
+                    'composer_outdated' => [
+                        'enabled'           => false,
+                        'binary'            => 'composer',
+                        'timeout_s'         => 60,
+                        'warning_threshold' => 10,
+                        'failure_threshold' => 25,
+                    ],
+                    'inactive_admin_users' => [
+                        'enabled'           => true,
+                        'days'              => 90,
+                        'warning_threshold' => 1,
+                        'failure_threshold' => null,
+                    ],
+                    'users_without_2fa' => [
+                        'enabled'           => true,
+                        'warning_threshold' => 1,
+                        'failure_threshold' => null,
+                    ],
+                    'versions_table' => [
+                        'enabled'           => true,
+                        'warning_threshold' => 500000,
+                        'failure_threshold' => 1000000,
+                    ],
+                    'largest_tables' => [
+                        'enabled' => true,
+                        'limit'   => 10,
+                    ],
+                    'assets_storage' => [
+                        'enabled'           => true,
+                        'warning_threshold' => null,
+                        'failure_threshold' => null,
+                    ],
+                    'objects_per_class' => [
+                        'enabled'               => true,
+                        'limit'                 => 10,
+                        'warn_on_empty_classes' => false,
+                    ],
+                    'stale_objects' => [
+                        'enabled'           => true,
+                        'days'              => 365,
+                        'warning_threshold' => null,
+                        'failure_threshold' => null,
+                    ],
+                    'unpublished_objects' => [
+                        'enabled'           => true,
+                        'warning_threshold' => null,
+                        'failure_threshold' => null,
+                    ],
+                    'assets_without_metadata' => [
+                        'enabled'           => true,
+                        'asset_types'       => ['image'],
+                        'metadata_names'    => [],
+                        'warning_threshold' => null,
+                        'failure_threshold' => null,
+                    ],
+                    'asset_types' => [
+                        'enabled'               => true,
+                        'limit'                 => 10,
+                        'disallowed_extensions' => ['exe', 'bat', 'cmd', 'com', 'msi', 'dll', 'sh', 'ps1', 'scr'],
+                    ],
+                    'documents_missing_seo' => [
+                        'enabled'           => true,
+                        'published_only'    => true,
+                        'warning_threshold' => null,
+                        'failure_threshold' => null,
+                    ],
                 ],
             ],
             $config
