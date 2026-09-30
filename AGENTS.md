@@ -4,13 +4,21 @@ Instructions for AI coding agents working on this repository.
 
 ## What this is
 
-A Pimcore bundle with exactly one runtime entry point: `GET /health-check-status`. It runs a list
-of checks and answers `SUCCESS` (200) or `FAILURE: [<id>]` (503) in `text/plain`, for uptime
-monitors such as StatusCake or Pingdom.
+A Pimcore bundle with two faces.
 
-A second route, `GET /health-check-live`, runs no check and always answers `SUCCESS`.
+The monitoring face: `GET /health-check-status` runs the **core checks** (tag
+`basilicom.health_check`) and answers `SUCCESS` (200) or `FAILURE: [<id>]` (503) in `text/plain`,
+for uptime monitors such as StatusCake or Pingdom. `GET /health-check-live` runs no check and
+always answers `SUCCESS`.
 
-There is no admin UI, no ExtJS, no Studio frontend. The bundle is invisible inside Pimcore.
+The inventory face: `bin/console basilicom:health-check:audit` runs the core checks plus the
+**audit checks** (tag `basilicom.health_check.audit`, `Checks/Audit/*`) and stores the result in
+Pimcore's settings store. `GET /health-check` (the System Health Status page) and
+`GET /health-check/api` render that stored run for a logged in Pimcore admin or a caller with the
+API key. They never run a check.
+
+There is no ExtJS, no Studio frontend, no admin menu entry. The dashboard is a plain HTML page with
+inline CSS at its own route.
 
 ## Hard constraints
 
@@ -32,6 +40,22 @@ There is no admin UI, no ExtJS, no Studio frontend. The bundle is invisible insi
 - **Checks must be side-effect free and safe to run in parallel.** A monitor polls every minute,
   often from several probes at once. Probe files and cache keys therefore carry a random suffix —
   a fixed name lets two concurrent requests delete each other's probe and report a false outage.
+- **The dashboard and the API never run a check.** They read what `basilicom:health-check:audit`
+  stored. A page view costs one settings-store read. Anything that sizes a directory, counts a
+  table, shells out or leaves the host belongs to the audit group and runs from cron.
+- **The dashboard and the API are never public.** Admin session (the admin flag, not
+  `ROLE_PIMCORE_USER`) or the `X-Health-Check-Api-Key` header, checked in `Security\AccessGuard`.
+  Unauthorised is 404 with an empty body, the same as the monitoring endpoint. The key is a
+  separate secret from `token` and is never read from the query string.
+- **An audit failure is a red row, not a dropped node.** The monitoring endpoint never sees audit
+  results, so `Severity::Failure` in `Checks/Audit/*` means "needs attention now" and is labelled
+  `check_result_critical`. The "resource pressure is a warning" rule below applies to core checks,
+  whose failures take the node out of the load balancer.
+- **`n/a` and `skipped` are not verdicts.** A missing table, an absent binary, an unreachable
+  endoflife.date, a request-bound check on the CLI - `Report::notAvailable()` / `Report::skipped()`.
+  They never change the outcome of a run and never become a failure.
+- **Identifiers are stable.** `identifier()` (`system:php_version`) is the API key of a check and
+  what `?check=` selects; renaming one breaks somebody's monitoring.
 - **`isActive()` is the only switch.** `HealthCheckService` iterates the tagged checks and skips
   inactive ones. A check must not decide its own relevance any other way.
 - **Resource pressure is a warning, never a failure.** Only a node that cannot serve requests gets
@@ -53,7 +77,7 @@ There is no admin UI, no ExtJS, no Studio frontend. The bundle is invisible insi
   settings through the constructor. `Pimcore::getKernel()->getContainer()` is what made the old
   implementation untestable — it does not come back.
 
-## Adding a check
+## Adding a core check
 
 1. Implement `Checks\CheckInterface`, `final readonly`, collaborators plus `private bool $enabled`
    in the constructor.
@@ -67,13 +91,40 @@ There is no admin UI, no ExtJS, no Studio frontend. The bundle is invisible insi
    extension flattens the whole `checks` tree into parameters, so it needs no change.
 5. Cover it in `tests/Unit/Checks/`, and extend the tag assertions in `tests/Integration/`.
 
+## Adding an audit check
+
+1. Extend `Checks\AbstractReportingCheck` in `Checks/Audit/`, `final readonly`, call
+   `parent::__construct($enabled)`. Give it a stable `identifier()` (`group:name`) and a `label()`.
+2. Implement `examine(): Report` with the named constructors - `Report::ok()` carries a message
+   too, that is what the dashboard shows on a green row. Grade numbers with `Report::graded()`,
+   whose thresholds may be `null`. Reach for `Report::notAvailable()` when the data cannot be had
+   and `Report::skipped()` when there is nothing to examine; never turn either into a failure.
+   `examine()` may throw - `inspect()` reports the exception class, not its message.
+3. Keep absolute paths, DSNs and error messages out of `message`; put a path in `data` if it helps.
+4. Config node as above; thresholds via `Configuration::thresholds()` so `null` is accepted.
+5. Register with the `basilicom.health_check.audit` tag. Priorities: free local facts high,
+   database counts in the middle, directory sizing and composer last.
+6. Cover it in `tests/Unit/Checks/Audit/` with a mocked `Connection`; `AUDIT_CHECK_COUNT` in
+   `tests/Integration/ServiceWiringTest.php` goes up by one.
+
 ## Layout
 
-- `Controller/HealthCheckController` — the single route, maps exceptions to the response
-- `Services/HealthCheckService` — runs the tagged checks in priority order
-- `Checks/*` — one check per class, all implementing `CheckInterface`
+- `Controller/HealthCheckController` — the monitoring routes, maps exceptions to the response
+- `Controller/DashboardController`, `Controller/ApiController` — render the stored audit run
+- `Command/HealthCheckCommand` — the core checks with reasons, for a shell
+- `Command/AuditCommand` — runs core + audit checks, stores the run
+- `Services/HealthCheckService` — runs tagged checks in priority order; two instances, one per tag
+- `Services/CheckResult` — one result; `Services/EndOfLifeDateClient` — cached endoflife.date lookups
+- `Checks/*` — core checks implementing `CheckInterface`
+- `Checks/Report`, `Checks/ReportingCheckInterface`, `Checks/AbstractReportingCheck` — the
+  reporting contract
+- `Checks/Audit/*` — the audit checks
+- `Audit/*` — `StoredRun` and the run store
+- `Security/*` — `AccessGuard` and the admin session lookup
+- `Util/*` — byte formatting, `du`-based directory sizing
 - `Exception/*` — one subclass of `AbstractHealthCheckException` per failure mode
 - `DependencyInjection/*` — config tree and the extension that turns it into parameters
+- `Resources/views/dashboard.html.twig` — the page, inline CSS, no JavaScript
 - `Resources/config/pimcore/routing.yml` — picked up automatically by Pimcore's `BundleConfigLocator`
 
 ## Commands
@@ -127,6 +178,19 @@ it is what catches an API that moved or disappeared between the supported lines.
 - **No maintenance mode check.** `Tool\Admin::activateMaintenanceMode()` exists in Pimcore 11 and 12
   but is gone in 2026, and no `isMaintenanceModeActive()` exists in any of them. There is no
   cross-version API to build it on.
-- **No Messenger failed-queue check.** Pimcore ships no Messenger configuration, `messenger_messages`
-  is not in the install dump, and the failure transport name is set per project. Nothing reliable to
-  key on at bundle level.
+- **The Messenger checks are audit checks and answer `n/a` without the table.** `messenger_messages`
+  is not in the install dump - Symfony's Doctrine transport creates it on first use - and the
+  failure transport name is per project (`messenger.failed_queue_names`, plus any `*_failed`). Both
+  are configuration, never a failure, and none of it reaches the monitoring endpoint.
+- **Directory sizes need `du`.** `Util\DirectorySize` has no PHP fallback: a recursive scan of a
+  large project has no upper bound. Without `du`, or past `audit.directory_size_timeout_s`, the
+  size is `n/a`.
+- **Two asset storage checks, on purpose.** Core `AssetStorageCheck` probes writability of the
+  Flysystem storage; audit `AssetStorageSizeCheck` counts assets and sizes `public/var/assets`.
+  Pimcore 11+ keeps no file size in the `assets` table.
+- **`PimcoreAdminSession` calls `Pimcore\Tool\Authentication::authenticateSession()`**, a static
+  Pimcore helper, behind `Security\AdminSessionInterface` so everything above it is testable. It
+  is the one place that reads Pimcore state statically; do not add a second.
+- **`PimcoreConfigurationCheck` and the plain core checks show no message on a green row.** Their
+  contract is `check(): void`; the dashboard prints `—`. Converting them to reporting checks was
+  deliberately left out of 2.1 to keep the monitoring path untouched.
