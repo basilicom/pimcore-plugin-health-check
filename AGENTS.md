@@ -137,6 +137,22 @@ make lint-fix     # php-cs-fixer, also adds the license header to new files
 
 Everything runs in Docker; no local PHP or Composer is required.
 
+```bash
+make start        # local demo: Pimcore 11 + this working tree on http://localhost:8085 (admin / admin)
+make demo-audit   # re-run the audit so /health-check shows the current tree
+make stop / down / destroy   # keep everything / keep volumes / start from scratch
+```
+
+The demo (`docker-compose.yaml`, profile `demo`, provisioned by `.docker/demo/run.sh`) symlinks the
+working tree into a throwaway Pimcore app, so PHP changes are live; config and DI changes need
+`make demo-shell` + `bin/console cache:clear`. Pimcore 11 needs no licence, but the last public 11.x
+has advisories fixed only in Enterprise releases: `run.sh` excepts them by id, for blocking only. A
+new advisory stops the install, which is the signal to review that list. `DEMO_SKELETON=^2026` in
+`.env.local` plus the product-key trio installs Pimcore 2026 instead (switching needs
+`make destroy`). Bundles are enabled with `blackbit_digital_commerce/pimcore-bundle-manager`, which is
+required by the demo app only and never by this bundle. The demo installs the default `admin` account,
+so `/health-check-status` answers `FAILURE` there on purpose.
+
 CI (`.github/workflows/ci.yml`) runs the same pinned tool images, plus the test suite and PHPStan
 against a matrix of Pimcore 11 / 12 / 2026. Pimcore 11 does not run on PHP 8.4 and Pimcore 2026
 does not run on PHP 8.3, so the matrix lists the combinations explicitly rather than crossing them.

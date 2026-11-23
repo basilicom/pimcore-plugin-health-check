@@ -6,3 +6,4 @@ composer.lock
 .env
 tests/*.bak
 .php-cs-fixer.cache
+/.env.local
