@@ -1,5 +1,76 @@
 # Changelog
 
+## 2.1.0
+
+The System Health Status dashboard (PF-415): the picture the monitoring endpoint deliberately
+withholds, for people who are allowed to see it.
+
+### Added
+
+- `GET /health-check`, the **System Health Status** page: one row per check with status label,
+  name and message, coloured by result, a *Details* toggle for the measured values. Plain HTML with
+  inline CSS, no external asset. Path via `dashboard.path`, off via `dashboard.enabled: false`.
+- `GET /health-check/api`, the same run as JSON with `status`, `healthy`, `summary` and one entry
+  per check; `?check=<identifier>` for a single one. Path via `dashboard.api_path`.
+- `bin/console basilicom:health-check:audit`, which runs the core and the audit checks, stores the
+  result in Pimcore's settings store and exits non-zero on a failure. The dashboard and the API
+  read that stored run and **run no check themselves** - the inventory work (directory sizes,
+  table counts, `composer`, endoflife.date) happens from cron, not from a page view.
+- Access control for both routes: a logged in Pimcore **admin** (the admin flag, not any backend
+  user) or the `X-Health-Check-Api-Key` header. The key (`dashboard.api_key`, at least 16
+  characters, `hash_equals()`) is a separate secret from `token`, because it hands out the inventory
+  where the token only says healthy or not. It is never read from the query string. An unauthorised
+  request gets 404 with an empty body, like the monitoring endpoint.
+- **36 audit checks** under `Checks\Audit\`, tagged `basilicom.health_check.audit`: the fifteen
+  checks of instride/pimcore-monitor (app environment, PHP and MySQL/MariaDB version, Doctrine
+  migrations, disk and hosting size, database and table size, Pimcore version, bundles, areabricks,
+  users, element count, maintenance age), the CS-990 checks (messenger count and age, `prod.log` /
+  `php.log` errors, application log errors, `composer audit`) and the PF-88 metrics that need no
+  external tool (composer outdated, failed messages, inactive admins, admins without 2FA, debug
+  mode, versions table, largest tables, DataObject classes, objects per class, documents by type,
+  stale and unpublished objects, assets storage, assets without metadata, asset types, custom
+  templates, pages without SEO metadata).
+- `HttpsConnectionCheck` in the core group: warns when the request that runs the checks arrived
+  over plain HTTP, skipped on the CLI.
+- **Dynamic version checks.** With no `version` configured, `php_version` and `mysql_version` grade
+  against the release cycles on endoflife.date: critical past end of life, warning when a newer
+  cycle is supported. Responses are cached for a day; a failed lookup is remembered for ten minutes
+  (`external_lookups`). The MySQL check detects MariaDB vs MySQL first - the two number their
+  releases differently, so no single hard-coded version is right for both.
+- `Checks\ReportingCheckInterface`, `Checks\AbstractReportingCheck` and `Checks\Report`: a check
+  that has something to say when it passes. `inspect()` never throws; `check(): void` still works
+  for the monitoring endpoint. `Report::graded()` grades a value against two inclusive thresholds,
+  either of which may be `null`.
+- `Severity::Skipped` and `Severity::NotAvailable`, with `label()` (`check_result_ok`,
+  `check_result_warning`, `check_result_critical`, `check_result_skipped`, `check_result_na` - the
+  instride/pimcore-monitor names) and `key()` / `fromKey()` for the API.
+- `Services\CheckResult` gained optional `message`, `data`, `identifier`, `label` and `durationMs`.
+  A plain check derives `identifier()` and `label()` from its class name (`core:database_accessible`,
+  `Database Accessible`).
+- `Audit\StoredRun`, `Audit\RunStoreInterface` and `Audit\SettingsStoreRunStore`;
+  `Security\AccessGuard`, `Security\AdminSessionInterface`, `Security\PimcoreAdminSession`;
+  `Services\EndOfLifeDateClient`; `Util\Bytes`, `Util\DirectorySize`.
+- Configuration: `dashboard`, `audit`, `external_lookups`, `messenger` and one `checks.<name>` node
+  per audit check. Thresholds accept a number or `null`.
+
+### Changed
+
+- `HealthCheckService::run()` records the duration of every check and, for a reporting check, its
+  message, data, identifier and label. Plain checks are unaffected.
+- `basilicom:health-check` prints `SKIPPED` and `N/A` rows for the two new severities.
+
+### Notes
+
+- Directory sizes come from `du` with a timeout (`audit.directory_size_timeout_s`) and there is no
+  PHP fallback on purpose: a recursive scan of a large project has no upper bound, and `n/a` is the
+  honest answer when `du` does not finish.
+- `messenger_message_count` and `messenger_message_age` count waiting messages only: delivered ones
+  and those parked in a failure transport (`messenger.failed_queue_names`, plus any `*_failed`) are
+  excluded, so one dead message cannot keep the age red forever. `failed_messages` reports those
+  separately.
+- The two composer checks are off by default; they need the `composer` binary and network access on
+  the host.
+
 ## 2.0.0
 
 ### Breaking

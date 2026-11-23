@@ -61,9 +61,11 @@ final class HealthCheckCommand extends Command
                 static fn (CheckResult $result): array => [
                     $result->shortName(),
                     match ($result->severity) {
-                        Severity::Ok      => '<fg=green>SUCCESS</>',
-                        Severity::Warning => '<fg=yellow>WARNING</>',
-                        Severity::Failure => '<fg=red>FAILURE</>',
+                        Severity::Ok           => '<fg=green>SUCCESS</>',
+                        Severity::Warning      => '<fg=yellow>WARNING</>',
+                        Severity::Failure      => '<fg=red>FAILURE</>',
+                        Severity::Skipped      => '<fg=gray>SKIPPED</>',
+                        Severity::NotAvailable => '<fg=gray>N/A</>',
                     },
                     $result->reason(),
                 ],

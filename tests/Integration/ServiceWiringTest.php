@@ -20,10 +20,15 @@ use Basilicom\PimcorePluginHealthCheck\Checks\DatabaseAccessibleCheck;
 use Basilicom\PimcorePluginHealthCheck\Checks\DatabaseLatencyCheck;
 use Basilicom\PimcorePluginHealthCheck\Checks\DiskSpaceCheck;
 use Basilicom\PimcorePluginHealthCheck\Checks\FilesystemCheck;
+use Basilicom\PimcorePluginHealthCheck\Checks\HttpsConnectionCheck;
 use Basilicom\PimcorePluginHealthCheck\Checks\PendingMigrationsCheck;
 use Basilicom\PimcorePluginHealthCheck\Checks\PimcoreConfigurationCheck;
+use Basilicom\PimcorePluginHealthCheck\Checks\ReportingCheckInterface;
 use Basilicom\PimcorePluginHealthCheck\Checks\RobotsTxtCheck;
+use Basilicom\PimcorePluginHealthCheck\Command\AuditCommand;
 use Basilicom\PimcorePluginHealthCheck\Command\HealthCheckCommand;
+use Basilicom\PimcorePluginHealthCheck\Controller\ApiController;
+use Basilicom\PimcorePluginHealthCheck\Controller\DashboardController;
 use Basilicom\PimcorePluginHealthCheck\Controller\HealthCheckController;
 use Basilicom\PimcorePluginHealthCheck\DependencyInjection\PimcorePluginHealthCheckExtension;
 use Basilicom\PimcorePluginHealthCheck\Services\HealthCheckService;
@@ -37,6 +42,8 @@ use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Console\Command\Command as ConsoleCommand;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Twig\Environment;
 
 class ServiceWiringTest extends TestCase
 {
@@ -52,7 +59,10 @@ class ServiceWiringTest extends TestCase
         AssetStorageCheck::class,
         CacheCheck::class,
         RobotsTxtCheck::class,
+        HttpsConnectionCheck::class,
     ];
+
+    private const int AUDIT_CHECK_COUNT = 36;
 
     #[Test]
     public function theBundleServicesCompileAndCanBeInstantiated(): void
@@ -281,6 +291,70 @@ class ServiceWiringTest extends TestCase
         );
     }
 
+    #[Test]
+    public function theAuditChecksAreTaggedSeparatelyAndOrderedByPriority(): void
+    {
+        // prepare
+        $container = $this->buildContainer();
+
+        // test
+        $container->compile();
+
+        // verify
+        $tagged = $container->findTaggedServiceIds('basilicom.health_check.audit');
+        $this->assertCount(self::AUDIT_CHECK_COUNT, $tagged);
+        $this->assertSame([], array_intersect(array_keys($tagged), self::CHECK_CLASSES), 'a check belongs to one group only');
+
+        $priorities = [];
+        foreach ($tagged as $id => $tags) {
+            $priorities[$id] = $tags[0]['priority'];
+            $check           = $container->get($id);
+            $this->assertInstanceOf(ReportingCheckInterface::class, $check);
+            $this->assertMatchesRegularExpression('/^[a-z]+:[a-z0-9_]+$/', $check->identifier());
+        }
+        $this->assertSame(count($priorities), count(array_unique($priorities)), 'audit priorities are unique');
+
+        $this->assertInstanceOf(HealthCheckService::class, $container->get('basilicom.health_check.audit_service'));
+    }
+
+    #[Test]
+    public function theDashboardApiAndAuditCommandAreWiredWithTheirDefaults(): void
+    {
+        // prepare
+        $container = $this->buildContainer();
+
+        // test
+        $container->compile();
+
+        // verify
+        $this->assertInstanceOf(DashboardController::class, $container->get(DashboardController::class));
+        $this->assertInstanceOf(ApiController::class, $container->get(ApiController::class));
+        $this->assertInstanceOf(AuditCommand::class, $container->get(AuditCommand::class));
+        $this->assertArrayHasKey(AuditCommand::class, $container->findTaggedServiceIds('console.command'));
+        $this->assertTrue($container->getParameter('pimcore_plugin_health_check.dashboard.enabled'));
+        $this->assertSame('/health-check', $container->getParameter('pimcore_plugin_health_check.dashboard.path'));
+        $this->assertSame('/health-check/api', $container->getParameter('pimcore_plugin_health_check.dashboard.api_path'));
+        $this->assertNull($container->getParameter('pimcore_plugin_health_check.dashboard.api_key'));
+        $this->assertSame(120000, $container->getParameter('pimcore_plugin_health_check.audit.timeout_ms'));
+        $this->assertSame(['failed'], $container->getParameter('pimcore_plugin_health_check.messenger.failed_queue_names'));
+    }
+
+    #[Test]
+    public function theDirectoryParametersFollowTheProjectDirectory(): void
+    {
+        // prepare
+        $container = $this->buildContainer();
+
+        // test
+        $container->compile();
+
+        // verify
+        $this->assertSame('/tmp/project/var/log', $container->getParameter('pimcore_plugin_health_check.logs_directory'));
+        $this->assertSame('/tmp/project/templates', $container->getParameter('pimcore_plugin_health_check.templates_directory'));
+        $this->assertSame('/tmp/project/public/var/assets', $container->getParameter('pimcore_plugin_health_check.asset_storage_directory'));
+        $this->assertSame('/tmp/project/public/var/tmp/thumbnails', $container->getParameter('pimcore_plugin_health_check.thumbnail_directory'));
+    }
+
     private function buildContainer(array $config = []): ContainerBuilder
     {
         $container = $this->scaffoldedContainer();
@@ -289,7 +363,16 @@ class ServiceWiringTest extends TestCase
 
         $ids = array_merge(
             self::CHECK_CLASSES,
-            [HealthCheckService::class, HealthCheckController::class, HealthCheckCommand::class]
+            array_keys($container->findTaggedServiceIds('basilicom.health_check.audit')),
+            [
+                HealthCheckService::class,
+                'basilicom.health_check.audit_service',
+                HealthCheckController::class,
+                DashboardController::class,
+                ApiController::class,
+                HealthCheckCommand::class,
+                AuditCommand::class,
+            ]
         );
         foreach ($ids as $id) {
             $container->getDefinition($id)->setPublic(true);
@@ -302,6 +385,12 @@ class ServiceWiringTest extends TestCase
     {
         $container = new ContainerBuilder();
         $container->setParameter('kernel.project_dir', '/tmp/project');
+        $container->setParameter('kernel.environment', 'test');
+        $container->setParameter('kernel.debug', false);
+
+        $container->setDefinition('twig', new Definition(Environment::class))->setSynthetic(true);
+        $container->set('twig', $this->createMock(Environment::class));
+        $container->setDefinition(RequestStack::class, new Definition(RequestStack::class));
 
         $container->setDefinition('doctrine.dbal.default_connection', new Definition(Connection::class))
             ->setSynthetic(true);

@@ -7,6 +7,9 @@ services:
     # Priorities put the checks that cost nothing first, so a hung dependency later on cannot eat
     # the timeout budget before the free local diagnostics have run.
 
+    #
+    # Core checks - tag basilicom.health_check - run on every request to /health-check-status
+    #
     Basilicom\PimcorePluginHealthCheck\Checks\PimcoreConfigurationCheck:
         # first - every other check assumes a readable configuration
         tags:
@@ -79,15 +82,349 @@ services:
         tags:
             - { name: basilicom.health_check, priority: 50 }
 
+    Basilicom\PimcorePluginHealthCheck\Checks\HttpsConnectionCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.https_connection.enabled%'
+        tags:
+            - { name: basilicom.health_check, priority: 45 }
+
+    #
+    # Audit checks - tag basilicom.health_check.audit - run by basilicom:health-check:audit only.
+    # Order: free local facts first, database counts next, directory sizing and composer last.
+    #
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\PimcoreVersionCheck:
+        arguments: { $enabled: '%pimcore_plugin_health_check.checks.pimcore_version.enabled%' }
+        tags: [{ name: basilicom.health_check.audit, priority: 100 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\AppEnvironmentCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.app_environment.enabled%'
+            $environment: '%kernel.environment%'
+            $expectedEnvironment: '%pimcore_plugin_health_check.checks.app_environment.environment%'
+        tags: [{ name: basilicom.health_check.audit, priority: 98 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\DebugModeCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.debug_mode.enabled%'
+            $debug: '%kernel.debug%'
+            $environment: '%kernel.environment%'
+        tags: [{ name: basilicom.health_check.audit, priority: 96 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\PhpVersionCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.php_version.enabled%'
+            $requiredVersion: '%pimcore_plugin_health_check.checks.php_version.version%'
+            $operator: '%pimcore_plugin_health_check.checks.php_version.operator%'
+        tags: [{ name: basilicom.health_check.audit, priority: 94 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\PimcoreBundlesCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.pimcore_bundles.enabled%'
+            $bundleManager: '@?Pimcore\Extension\Bundle\PimcoreBundleManager'
+        tags: [{ name: basilicom.health_check.audit, priority: 92 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\PimcoreAreabricksCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.pimcore_areabricks.enabled%'
+            $areabrickManager: '@?Pimcore\Extension\Document\Areabrick\AreabrickManagerInterface'
+        tags: [{ name: basilicom.health_check.audit, priority: 90 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\DoctrineMigrationsCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.doctrine_migrations.enabled%'
+            $dependencyFactory: '@?doctrine.migrations.dependency_factory'
+        tags: [{ name: basilicom.health_check.audit, priority: 88 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\MysqlVersionCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.mysql_version.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $requiredVersion: '%pimcore_plugin_health_check.checks.mysql_version.version%'
+            $operator: '%pimcore_plugin_health_check.checks.mysql_version.operator%'
+        tags: [{ name: basilicom.health_check.audit, priority: 86 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\PimcoreUsersCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.pimcore_users.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+        tags: [{ name: basilicom.health_check.audit, priority: 84 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\DataObjectClassesCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.dataobject_classes.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+        tags: [{ name: basilicom.health_check.audit, priority: 82 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\PimcoreElementCountCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.pimcore_element_count.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.pimcore_element_count.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.pimcore_element_count.failure_threshold%'
+        tags: [{ name: basilicom.health_check.audit, priority: 80 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\ObjectsPerClassCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.objects_per_class.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $limit: '%pimcore_plugin_health_check.checks.objects_per_class.limit%'
+            $warnOnEmptyClasses: '%pimcore_plugin_health_check.checks.objects_per_class.warn_on_empty_classes%'
+        tags: [{ name: basilicom.health_check.audit, priority: 78 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\DocumentsByTypeCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.documents_by_type.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+        tags: [{ name: basilicom.health_check.audit, priority: 76 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\StaleObjectsCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.stale_objects.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $days: '%pimcore_plugin_health_check.checks.stale_objects.days%'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.stale_objects.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.stale_objects.failure_threshold%'
+        tags: [{ name: basilicom.health_check.audit, priority: 74 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\UnpublishedObjectsCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.unpublished_objects.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.unpublished_objects.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.unpublished_objects.failure_threshold%'
+        tags: [{ name: basilicom.health_check.audit, priority: 72 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\DocumentsMissingSeoCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.documents_missing_seo.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $publishedOnly: '%pimcore_plugin_health_check.checks.documents_missing_seo.published_only%'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.documents_missing_seo.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.documents_missing_seo.failure_threshold%'
+        tags: [{ name: basilicom.health_check.audit, priority: 70 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\AssetTypesCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.asset_types.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $limit: '%pimcore_plugin_health_check.checks.asset_types.limit%'
+            $disallowedExtensions: '%pimcore_plugin_health_check.checks.asset_types.disallowed_extensions%'
+        tags: [{ name: basilicom.health_check.audit, priority: 68 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\AssetsWithoutMetadataCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.assets_without_metadata.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $assetTypes: '%pimcore_plugin_health_check.checks.assets_without_metadata.asset_types%'
+            $metadataNames: '%pimcore_plugin_health_check.checks.assets_without_metadata.metadata_names%'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.assets_without_metadata.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.assets_without_metadata.failure_threshold%'
+        tags: [{ name: basilicom.health_check.audit, priority: 66 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\VersionsTableCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.versions_table.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.versions_table.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.versions_table.failure_threshold%'
+        tags: [{ name: basilicom.health_check.audit, priority: 64 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\DatabaseSizeCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.database_size.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.database_size.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.database_size.failure_threshold%'
+        tags: [{ name: basilicom.health_check.audit, priority: 62 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\DatabaseTableSizeCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.database_table_size.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.database_table_size.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.database_table_size.failure_threshold%'
+        tags: [{ name: basilicom.health_check.audit, priority: 60 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\LargestTablesCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.largest_tables.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $limit: '%pimcore_plugin_health_check.checks.largest_tables.limit%'
+        tags: [{ name: basilicom.health_check.audit, priority: 58 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\InactiveAdminUsersCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.inactive_admin_users.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $days: '%pimcore_plugin_health_check.checks.inactive_admin_users.days%'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.inactive_admin_users.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.inactive_admin_users.failure_threshold%'
+        tags: [{ name: basilicom.health_check.audit, priority: 56 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\UsersWithoutTwoFactorCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.users_without_2fa.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.users_without_2fa.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.users_without_2fa.failure_threshold%'
+        tags: [{ name: basilicom.health_check.audit, priority: 54 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\MaintenanceLastRunCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.maintenance_last_run.enabled%'
+            $executor: '@?Pimcore\Maintenance\Executor'
+            $warningMinutes: '%pimcore_plugin_health_check.checks.maintenance_last_run.warning_minutes%'
+            $failureMinutes: '%pimcore_plugin_health_check.checks.maintenance_last_run.failure_minutes%'
+        tags: [{ name: basilicom.health_check.audit, priority: 52 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\MessengerMessageCountCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.messenger_message_count.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $failedQueueNames: '%pimcore_plugin_health_check.messenger.failed_queue_names%'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.messenger_message_count.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.messenger_message_count.failure_threshold%'
+        tags: [{ name: basilicom.health_check.audit, priority: 50 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\MessengerMessageAgeCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.messenger_message_age.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $failedQueueNames: '%pimcore_plugin_health_check.messenger.failed_queue_names%'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.messenger_message_age.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.messenger_message_age.failure_threshold%'
+        tags: [{ name: basilicom.health_check.audit, priority: 48 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\FailedMessagesCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.failed_messages.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $failedQueueNames: '%pimcore_plugin_health_check.messenger.failed_queue_names%'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.failed_messages.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.failed_messages.failure_threshold%'
+        tags: [{ name: basilicom.health_check.audit, priority: 46 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\ApplicationLogErrorsCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.application_log_errors.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $lookbackHours: '%pimcore_plugin_health_check.checks.application_log_errors.lookback_hours%'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.application_log_errors.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.application_log_errors.failure_threshold%'
+        tags: [{ name: basilicom.health_check.audit, priority: 44 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\LogFileErrorsCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.log_file_errors.enabled%'
+            $logDirectory: '%pimcore_plugin_health_check.logs_directory%'
+            $files: '%pimcore_plugin_health_check.checks.log_file_errors.files%'
+            $lookbackHours: '%pimcore_plugin_health_check.checks.log_file_errors.lookback_hours%'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.log_file_errors.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.log_file_errors.failure_threshold%'
+            $maxBytes: '%pimcore_plugin_health_check.checks.log_file_errors.max_bytes%'
+        tags: [{ name: basilicom.health_check.audit, priority: 42 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\CustomTemplatesCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.custom_templates.enabled%'
+            $templatesDirectory: '%pimcore_plugin_health_check.templates_directory%'
+        tags: [{ name: basilicom.health_check.audit, priority: 40 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\AssetStorageSizeCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.assets_storage.enabled%'
+            $connection: '@doctrine.dbal.default_connection'
+            $storagePath: '%pimcore_plugin_health_check.asset_storage_directory%'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.assets_storage.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.assets_storage.failure_threshold%'
+            $duTimeoutSeconds: '%pimcore_plugin_health_check.audit.directory_size_timeout_s%'
+        tags: [{ name: basilicom.health_check.audit, priority: 30 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\ThumbnailStorageCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.thumbnail_storage.enabled%'
+            $path: '%pimcore_plugin_health_check.thumbnail_directory%'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.thumbnail_storage.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.thumbnail_storage.failure_threshold%'
+            $duTimeoutSeconds: '%pimcore_plugin_health_check.audit.directory_size_timeout_s%'
+        tags: [{ name: basilicom.health_check.audit, priority: 28 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\HostingSizeCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.hosting_size.enabled%'
+            $path: '%pimcore_plugin_health_check.project_directory%'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.hosting_size.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.hosting_size.failure_threshold%'
+            $duTimeoutSeconds: '%pimcore_plugin_health_check.audit.directory_size_timeout_s%'
+        tags: [{ name: basilicom.health_check.audit, priority: 26 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\ComposerAuditCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.composer_audit.enabled%'
+            $binary: '%pimcore_plugin_health_check.checks.composer_audit.binary%'
+            $workingDirectory: '%pimcore_plugin_health_check.project_directory%'
+            $timeoutSeconds: '%pimcore_plugin_health_check.checks.composer_audit.timeout_s%'
+        tags: [{ name: basilicom.health_check.audit, priority: 20 }]
+
+    Basilicom\PimcorePluginHealthCheck\Checks\Audit\ComposerOutdatedCheck:
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.checks.composer_outdated.enabled%'
+            $binary: '%pimcore_plugin_health_check.checks.composer_outdated.binary%'
+            $workingDirectory: '%pimcore_plugin_health_check.project_directory%'
+            $timeoutSeconds: '%pimcore_plugin_health_check.checks.composer_outdated.timeout_s%'
+            $warningThreshold: '%pimcore_plugin_health_check.checks.composer_outdated.warning_threshold%'
+            $failureThreshold: '%pimcore_plugin_health_check.checks.composer_outdated.failure_threshold%'
+        tags: [{ name: basilicom.health_check.audit, priority: 18 }]
+
+    #
+    # Services
+    #
     Basilicom\PimcorePluginHealthCheck\Services\HealthCheckService:
         arguments:
             $checks: !tagged_iterator { tag: basilicom.health_check }
             $timeoutMilliseconds: '%pimcore_plugin_health_check.timeout_ms%'
 
+    # the same runner over the audit tag, with the larger budget an inventory needs
+    basilicom.health_check.audit_service:
+        class: Basilicom\PimcorePluginHealthCheck\Services\HealthCheckService
+        arguments:
+            $checks: !tagged_iterator { tag: basilicom.health_check.audit }
+            $timeoutMilliseconds: '%pimcore_plugin_health_check.audit.timeout_ms%'
+
+    Basilicom\PimcorePluginHealthCheck\Services\EndOfLifeDateClient:
+        arguments:
+            $cache: '@pimcore.cache.pool'
+            $enabled: '%pimcore_plugin_health_check.external_lookups.enabled%'
+            $timeoutSeconds: '%pimcore_plugin_health_check.external_lookups.timeout_s%'
+            $cacheTtl: '%pimcore_plugin_health_check.external_lookups.cache_ttl_s%'
+            $failureCacheTtl: '%pimcore_plugin_health_check.external_lookups.failure_cache_ttl_s%'
+    Basilicom\PimcorePluginHealthCheck\Services\EndOfLifeDateClientInterface: '@Basilicom\PimcorePluginHealthCheck\Services\EndOfLifeDateClient'
+
+    Basilicom\PimcorePluginHealthCheck\Audit\SettingsStoreRunStore: ~
+    Basilicom\PimcorePluginHealthCheck\Audit\RunStoreInterface: '@Basilicom\PimcorePluginHealthCheck\Audit\SettingsStoreRunStore'
+
+    Basilicom\PimcorePluginHealthCheck\Security\PimcoreAdminSession: ~
+    Basilicom\PimcorePluginHealthCheck\Security\AdminSessionInterface: '@Basilicom\PimcorePluginHealthCheck\Security\PimcoreAdminSession'
+
+    Basilicom\PimcorePluginHealthCheck\Security\AccessGuard:
+        arguments:
+            $apiKey: '%pimcore_plugin_health_check.dashboard.api_key%'
+
+    #
+    # Commands
+    #
     Basilicom\PimcorePluginHealthCheck\Command\HealthCheckCommand:
         arguments:
             $token: '%pimcore_plugin_health_check.token%'
 
+    Basilicom\PimcorePluginHealthCheck\Command\AuditCommand:
+        arguments:
+            $coreService: '@Basilicom\PimcorePluginHealthCheck\Services\HealthCheckService'
+            $auditService: '@basilicom.health_check.audit_service'
+
+    #
+    # Controllers
+    #
     Basilicom\PimcorePluginHealthCheck\Controller\HealthCheckController:
         public: true
         arguments:
@@ -96,3 +433,16 @@ services:
         tags:
             - { name: monolog.logger, channel: health_check }
             - 'controller.service_arguments'
+
+    Basilicom\PimcorePluginHealthCheck\Controller\DashboardController:
+        public: true
+        arguments:
+            $twig: '@twig'
+            $enabled: '%pimcore_plugin_health_check.dashboard.enabled%'
+        tags: ['controller.service_arguments']
+
+    Basilicom\PimcorePluginHealthCheck\Controller\ApiController:
+        public: true
+        arguments:
+            $enabled: '%pimcore_plugin_health_check.dashboard.enabled%'
+        tags: ['controller.service_arguments']

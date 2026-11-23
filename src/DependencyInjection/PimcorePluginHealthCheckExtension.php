@@ -30,22 +30,31 @@ final class PimcorePluginHealthCheckExtension extends Extension
         $container->setParameter('pimcore_plugin_health_check.timeout_ms', $config['timeout_ms']);
 
         // flattened so a new check needs a node and a service entry, but no change here
-        foreach ($config['checks'] as $check => $settings) {
-            foreach ($settings as $key => $value) {
-                $container->setParameter(sprintf('pimcore_plugin_health_check.checks.%s.%s', $check, $key), $value);
+        foreach (['checks', 'dashboard', 'audit', 'external_lookups', 'messenger'] as $section) {
+            foreach ($config[$section] as $key => $value) {
+                if (is_array($value) && $section === 'checks') {
+                    foreach ($value as $option => $setting) {
+                        $container->setParameter(sprintf('pimcore_plugin_health_check.checks.%s.%s', $key, $option), $setting);
+                    }
+
+                    continue;
+                }
+
+                $container->setParameter(sprintf('pimcore_plugin_health_check.%s.%s', $section, $key), $value);
             }
         }
 
         // Pimcore's constants win over the defaults, so projects that moved var/ or public/ keep working
         $projectDir = (string)$container->getParameter('kernel.project_dir');
-        $container->setParameter(
-            'pimcore_plugin_health_check.temp_directory',
-            defined('PIMCORE_SYSTEM_TEMP_DIRECTORY') ? PIMCORE_SYSTEM_TEMP_DIRECTORY : $projectDir . '/var/tmp'
-        );
-        $container->setParameter(
-            'pimcore_plugin_health_check.web_root_directory',
-            defined('PIMCORE_WEB_ROOT') ? PIMCORE_WEB_ROOT : $projectDir . '/public'
-        );
+        $webRoot    = defined('PIMCORE_WEB_ROOT') ? PIMCORE_WEB_ROOT : $projectDir . '/public';
+
+        $container->setParameter('pimcore_plugin_health_check.project_directory', defined('PIMCORE_PROJECT_ROOT') ? PIMCORE_PROJECT_ROOT : $projectDir);
+        $container->setParameter('pimcore_plugin_health_check.temp_directory', defined('PIMCORE_SYSTEM_TEMP_DIRECTORY') ? PIMCORE_SYSTEM_TEMP_DIRECTORY : $projectDir . '/var/tmp');
+        $container->setParameter('pimcore_plugin_health_check.web_root_directory', $webRoot);
+        $container->setParameter('pimcore_plugin_health_check.logs_directory', defined('PIMCORE_LOG_DIRECTORY') ? PIMCORE_LOG_DIRECTORY : $projectDir . '/var/log');
+        $container->setParameter('pimcore_plugin_health_check.templates_directory', $projectDir . '/templates');
+        $container->setParameter('pimcore_plugin_health_check.asset_storage_directory', $webRoot . '/var/assets');
+        $container->setParameter('pimcore_plugin_health_check.thumbnail_directory', $webRoot . '/var/tmp/thumbnails');
 
         $loader = new YamlFileLoader($container, new FileLocator(__DIR__ . '/../Resources/config'));
         $loader->load('services.yml');

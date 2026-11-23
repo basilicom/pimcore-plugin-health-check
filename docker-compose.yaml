@@ -1,0 +1,61 @@
+# Local demo for the bundle, driven by `make start` (see the Makefile). Behind the `demo` profile,
+# so a plain `docker compose up` starts nothing; the test and lint targets stay plain `docker run`.
+#
+# A throwaway Pimcore app with this working tree as a composer path dependency, provisioned by
+# .docker/demo/run.sh into the demo-app volume. Pimcore 11 by default, which needs no licence; set
+# DEMO_SKELETON plus the product-key trio in .env.local for 12.3 or 2026.
+services:
+  demo-db:
+    profiles: ["demo"]
+    image: mariadb:10.11
+    command: ["mariadbd", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_520_ci", "--innodb-file-per-table=1"]
+    environment:
+      MARIADB_ROOT_PASSWORD: pimcore
+      MARIADB_DATABASE: pimcore
+      MARIADB_USER: pimcore
+      MARIADB_PASSWORD: pimcore
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb -upimcore -ppimcore pimcore -e 'SELECT 1'"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+    volumes:
+      - demo-db:/var/lib/mysql
+
+  demo-app:
+    profiles: ["demo"]
+    image: ${DEMO_PIMCORE_IMAGE:-pimcore/pimcore:php8.3-latest}
+    working_dir: /app
+    depends_on:
+      demo-db:
+        condition: service_healthy
+    env_file:
+      # Licence values and overrides; never versioned.
+      - path: .env.local
+        required: false
+    environment:
+      APP_ENV: dev
+      APP_DEBUG: "1"
+      DATABASE_URL: mysql://pimcore:pimcore@demo-db:3306/pimcore
+      DEMO_SKELETON: ${DEMO_SKELETON:-^11.0}
+      DEMO_PORT_INTERNAL: "8081"
+      # A demo value, not a secret: the dashboard API is only reachable on localhost.
+      HEALTH_CHECK_API_KEY: ${HEALTH_CHECK_API_KEY:-demo-api-key-0123456789abcdef}
+      COMPOSER_HOME: /composer
+      PHP_CLI_SERVER_WORKERS: "8"
+      # Root in here, the checkout owned by the host user: git refuses it, and composer asks git.
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: /bundle
+    ports:
+      - "${DEMO_PORT:-8085}:8081"
+    volumes:
+      - .:/bundle
+      - demo-app:/app
+      - demo-composer:/composer
+    command: ["sh", "/bundle/.docker/demo/run.sh"]
+
+volumes:
+  demo-db:
+  demo-app:
+  demo-composer:

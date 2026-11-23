@@ -70,4 +70,48 @@ class CheckResultTest extends TestCase
         // test / verify
         $this->assertSame('CacheCheck', $result->shortName());
     }
+
+    #[Test]
+    public function reason_fallsBackToTheMessageWhenThereIsNoException(): void
+    {
+        // prepare
+        $result = new CheckResult('Basilicom\\PimcorePluginHealthCheck\\Checks\\CacheCheck', Severity::Ok, null, 'Current PHP version is 8.3.1');
+
+        // test / verify
+        $this->assertSame('Current PHP version is 8.3.1', $result->reason());
+    }
+
+    #[Test]
+    public function reason_prefersTheExceptionMessageOverTheMessage(): void
+    {
+        // prepare
+        $result = new CheckResult('Basilicom\\PimcorePluginHealthCheck\\Checks\\CacheCheck', Severity::Failure, new RuntimeException('boom'), 'ignored');
+
+        // test / verify
+        $this->assertSame('boom', $result->reason());
+    }
+
+    #[Test]
+    public function identifierAndLabel_areDerivedFromTheClassNameForAPlainCheck(): void
+    {
+        // prepare
+        $result = new CheckResult('Basilicom\\PimcorePluginHealthCheck\\Checks\\DatabaseAccessibleCheck');
+
+        // test / verify
+        $this->assertSame('core:database_accessible', $result->identifier());
+        $this->assertSame('Database Accessible', $result->label());
+    }
+
+    #[Test]
+    public function identifierAndLabel_useTheExplicitValuesWhenGiven(): void
+    {
+        // prepare
+        $result = new CheckResult('Foo\\PhpVersionCheck', Severity::Ok, null, '', ['a' => 1], 'system:php_version', 'PHP Version', 12);
+
+        // test / verify
+        $this->assertSame('system:php_version', $result->identifier());
+        $this->assertSame('PHP Version', $result->label());
+        $this->assertSame(['a' => 1], $result->data);
+        $this->assertSame(12, $result->durationMs);
+    }
 }
