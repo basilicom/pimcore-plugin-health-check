@@ -17,8 +17,7 @@ Pimcore's settings store. `GET /health-check` (the System Health Status page) an
 `GET /health-check/api` render that stored run for a logged in Pimcore admin or a caller with the
 API key. They never run a check.
 
-There is no ExtJS, no Studio frontend, no admin menu entry. The dashboard is a plain HTML page with
-inline CSS at its own route.
+There is no Studio frontend. The dashboard is a plain HTML page with inline CSS at its own route.
 
 ## Hard constraints
 
